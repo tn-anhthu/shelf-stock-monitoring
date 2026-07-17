@@ -9,3 +9,6 @@ data/benchmark_results/*
 !data/benchmark_results/sample_overlays/
 data/benchmark_results/sample_overlays/*
 !data/benchmark_results/sample_overlays/.gitkeep
+data/yolo_train/
+runs/
+yolov8n.pt
