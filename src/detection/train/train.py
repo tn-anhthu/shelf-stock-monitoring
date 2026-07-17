@@ -22,6 +22,10 @@ def main():
     parser.add_argument("--imgsz", type=int, default=640)
     parser.add_argument("--device", type=str, default="mps")
     parser.add_argument("--name", type=str, default="pilot")
+    parser.add_argument("--close-mosaic", type=int, default=10,
+                         help="Disable mosaic augmentation for the last N epochs (ultralytics "
+                              "default: 10). If N >= --epochs, mosaic is disabled almost the "
+                              "entire run — pass a smaller value for short runs.")
     args = parser.parse_args()
 
     print(f"Materializing {args.n_train} train / {args.n_val} val images...")
@@ -36,6 +40,7 @@ def main():
         device=args.device,
         project=str(RUNS_DIR),
         name=args.name,
+        close_mosaic=args.close_mosaic,
     )
     elapsed = time.time() - start
     per_epoch = elapsed / args.epochs
