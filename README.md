@@ -41,7 +41,9 @@ working-capital cho nhà bán lẻ nhỏ / informal retailer.
       eval, đạt ngưỡng 0.6 (precision 0.745). Xem
       `docs/detection-notes/2026-07-17-yolo-finetune-results.md`. Phase 1 (Detection)
       hoàn tất.
-- [ ] Classification: CLIP/SigLIP2 embedding matching + catalog ban đầu
+- [x] Classification benchmark: CLIP vs SigLIP2 zero-shot retrieval trên subset RPC
+      (Retail Product Checkout) — CLIP top-1 0.295, SigLIP2 top-1 0.676. Chọn SigLIP2.
+      Xem `docs/classification-notes/2026-07-18-classification-benchmark-results.md`.
 - [ ] Depth multiplier UI
 - [ ] Pricing aggregation
 - [ ] Human-in-the-loop confirmation message
