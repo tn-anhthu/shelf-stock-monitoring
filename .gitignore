@@ -1,5 +1,6 @@
 .venv-benchmark/
 .venv-train/
+.venv-classify/
 __pycache__/
 *.pyc
 .claude/worktrees/
