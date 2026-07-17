@@ -3,3 +3,8 @@ __pycache__/
 *.pyc
 .claude/worktrees/
 .pytest_cache/
+data/benchmark_results/*
+!data/benchmark_results/.gitkeep
+!data/benchmark_results/sample_overlays/
+data/benchmark_results/sample_overlays/*
+!data/benchmark_results/sample_overlays/.gitkeep
