@@ -2,6 +2,15 @@
 
 Usage: python3 -m src.classification.benchmark.report --n-test-images 15
 """
+import os
+
+# Must be set before torch is imported by any of this module's imports below —
+# torch reads this once at its own import time, not per-op. SigLIP2 is newer
+# and some ops may not have native MPS kernels, so this lets them fall back
+# to CPU instead of hard-crashing. See src/detection/benchmark/report.py for
+# the same pattern.
+os.environ.setdefault("PYTORCH_ENABLE_MPS_FALLBACK", "1")
+
 import argparse
 import json
 import time
@@ -77,7 +86,7 @@ def print_summary(report: dict) -> None:
         r = report[key]
         print(f"[{r['model_name']}] top1={r['top1_accuracy']:.3f}  top5={r['top5_accuracy']:.3f}  "
               f"evaluated={r['n_evaluated']} skipped={r['n_skipped_no_catalog_entry']}  "
-              f"avg inference: {r['avg_inference_seconds']:.3f}s/crop")
+              f"avg time/crop (embed+rank): {r['avg_inference_seconds']:.3f}s/crop")
 
 
 def main():

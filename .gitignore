@@ -15,3 +15,6 @@ runs/
 yolov8n.pt
 data/classification_results/*
 !data/classification_results/.gitkeep
+!data/classification_results/sample_crops/
+data/classification_results/sample_crops/*
+!data/classification_results/sample_crops/.gitkeep

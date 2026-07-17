@@ -33,6 +33,8 @@ SigLIP2's top-1 accuracy is substantially higher, making it the clear choice. Th
 
 The accuracy numbers are trustworthy, and SigLIP2 is recommended for Phase 2 integration.
 
+**Caveat on absolute numbers:** these accuracy figures are measured against a 16-category subset of RPC's full 200-category catalog, and should not be assumed to hold at full 200-category scale — a larger, harder catalog will likely yield lower absolute top-1/top-5 accuracy for both models. The *relative* CLIP-vs-SigLIP2 ranking, not the absolute magnitudes, is the load-bearing conclusion here.
+
 ## Next spec
 
 Phase 2 continuation: integrate SigLIP2 embedding retrieval + full catalog from RPC, then evaluate end-to-end performance on real Vietnamese retail checkout images (Future Work per design spec). If Phase 2 meets expected accuracy targets, proceed to Phase 3 (Depth multiplier) or finalize MVP; otherwise, reassess model selection or dataset augmentation.
