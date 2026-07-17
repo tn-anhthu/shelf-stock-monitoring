@@ -45,7 +45,7 @@ def load_test_crops(n_images: int = 15) -> List[Dict]:
 
 
 def build_catalog_source(
-    needed_categories: Set[int], max_per_category: int = 3, max_train_shards: int = 5
+    needed_categories: Set[int], max_per_category: int = 3, max_train_shards: int = 19
 ) -> List[Dict]:
     """Scan train shards 0..max_train_shards-1 for exemplar images of needed_categories."""
     found: Dict[int, List[Dict]] = {c: [] for c in needed_categories}
