@@ -37,7 +37,10 @@ working-capital cho nhà bán lẻ nhỏ / informal retailer.
 - [x] Detection benchmark run trên máy thật (M4 `mps`, 50 ảnh SKU-110K) → cả 1b (recall 0.17)
       và 1c (recall 0.09) đều dưới ngưỡng 0.45 → quyết định: fallback 1a (fine-tune YOLO). Xem
       `docs/detection-notes/2026-07-17-detection-benchmark-results.md`.
-- [ ] Detection: fine-tune YOLO nano trên subset SKU-110K (1a, theo quyết định ở trên)
+- [x] Detection: fine-tune YOLO nano trên SKU-110K (1a) — recall 0.782 trên 50 ảnh
+      eval, đạt ngưỡng 0.6 (precision 0.745). Xem
+      `docs/detection-notes/2026-07-17-yolo-finetune-results.md`. Phase 1 (Detection)
+      hoàn tất.
 - [ ] Classification: CLIP/SigLIP2 embedding matching + catalog ban đầu
 - [ ] Depth multiplier UI
 - [ ] Pricing aggregation
