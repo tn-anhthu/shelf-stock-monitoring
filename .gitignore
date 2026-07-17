@@ -13,3 +13,5 @@ data/benchmark_results/sample_overlays/*
 data/yolo_train/
 runs/
 yolov8n.pt
+data/classification_results/*
+!data/classification_results/.gitkeep
