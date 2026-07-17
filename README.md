@@ -10,9 +10,14 @@ working-capital cho nhà bán lẻ nhỏ / informal retailer.
 > đánh giá rủi ro tín dụng hoàn chỉnh.
 
 ## Pipeline
-1. **Detection (localization)** — fine-tune YOLO (nano, transfer learning) trên tập SKU-110K
-   (dense/overlapping shelf objects), chạy local trên M4 (`device='mps'`) hoặc Colab.
-   Auto-labeling hỗ trợ bằng Autodistill (Grounding DINO + SAM).
+1. **Detection (localization)** — trên tập SKU-110K (dense/overlapping shelf objects),
+   chạy local trên M4 (`device='mps'`) hoặc Colab. SKU-110K đã có sẵn ground-truth
+   bounding boxes nên không cần Autodistill để label chính dataset này — trước khi
+   fine-tune riêng, benchmark xem checkpoint có sẵn (YOLOv8 community) hoặc detector
+   zero-shot (Grounding DINO) có đủ dùng không (xem
+   `docs/superpowers/specs/2026-07-17-detection-benchmark-design.md`). Autodistill
+   (Grounding DINO + SAM) chỉ cần thiết sau này nếu tự chụp ảnh kệ hàng Việt Nam để
+   fine-tune thêm (ảnh đó chưa có label sẵn).
 2. **Classification** — crop từng box, dùng VLM embedding zero-shot (CLIP/SigLIP2) để match
    với catalog sản phẩm (retrieval-based, không cần train riêng cho từng SKU mới).
 3. **Depth multiplier (human-in-the-loop)** — sau detect, người dùng xác nhận + nhập số lớp
@@ -26,7 +31,13 @@ working-capital cho nhà bán lẻ nhỏ / informal retailer.
 - "Học từ feedback" liên tục / continual learning → để ở mục Future Work, không phải core MVP.
 
 ## Status
-- [ ] Detection: fine-tune trên subset SKU-110K (streaming qua Hugging Face `datasets`)
+- [x] Detection benchmark harness: `src/detection/benchmark/` — metrics module (IoU/precision/recall,
+      unit-tested), SKU-110K subset loader, wrappers for checkpoint (1b) và zero-shot (1c) candidates,
+      report + visualize scripts. Xem `docs/superpowers/plans/2026-07-17-detection-benchmark-sprint.md`.
+- [x] Detection benchmark run trên máy thật (M4 `mps`, 50 ảnh SKU-110K) → cả 1b (recall 0.17)
+      và 1c (recall 0.09) đều dưới ngưỡng 0.45 → quyết định: fallback 1a (fine-tune YOLO). Xem
+      `docs/detection-notes/2026-07-17-detection-benchmark-results.md`.
+- [ ] Detection: fine-tune YOLO nano trên subset SKU-110K (1a, theo quyết định ở trên)
 - [ ] Classification: CLIP/SigLIP2 embedding matching + catalog ban đầu
 - [ ] Depth multiplier UI
 - [ ] Pricing aggregation
