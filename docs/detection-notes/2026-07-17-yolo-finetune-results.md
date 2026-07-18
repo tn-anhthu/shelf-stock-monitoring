@@ -42,8 +42,7 @@ available training images and a third of the originally proposed epoch count. Bo
 precision and recall are now far ahead of 1b/1c — recall improved by roughly 4.5x over 1b's
 0.174, at a comparable precision (0.745 vs 0.723).
 
-Per the decision rule in `docs/superpowers/specs/2026-07-17-detection-yolo-finetune-design.md`,
-**Phase 1 (Detection) is done.**
+Per the design decision rule, **Phase 1 (Detection) is done.**
 
 ## Improvement attempt (not adopted)
 

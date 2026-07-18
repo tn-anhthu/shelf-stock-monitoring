@@ -21,7 +21,7 @@ SigLIP2 outperforms CLIP substantially and unambiguously:
 - Top-1 accuracy: SigLIP2 0.676 vs CLIP 0.295 (+38.1 percentage points)
 - Top-5 accuracy: SigLIP2 0.952 vs CLIP 0.743 (+20.9 percentage points)
 
-This decision follows the design spec's decision rule (see `docs/superpowers/specs/2026-07-17-classification-benchmark-design.md`, section "Ngưỡng quyết định"):
+This decision follows the design decision rule:
 - "Model có top-1 accuracy cao hơn rõ rệt → chọn model đó cho Phase 2."
 
 SigLIP2's top-1 accuracy is substantially higher, making it the clear choice. The performance gap is large enough that secondary considerations (inference time: CLIP 0.012s vs SigLIP2 0.025s) do not outweigh the accuracy advantage.

@@ -15,7 +15,7 @@ working-capital cho nhà bán lẻ nhỏ / informal retailer.
    bounding boxes nên không cần Autodistill để label chính dataset này — trước khi
    fine-tune riêng, benchmark xem checkpoint có sẵn (YOLOv8 community) hoặc detector
    zero-shot (Grounding DINO) có đủ dùng không (xem
-   `docs/superpowers/specs/2026-07-17-detection-benchmark-design.md`). Autodistill
+   `docs/detection-notes/2026-07-17-detection-benchmark-results.md`). Autodistill
    (Grounding DINO + SAM) chỉ cần thiết sau này nếu tự chụp ảnh kệ hàng Việt Nam để
    fine-tune thêm (ảnh đó chưa có label sẵn).
 2. **Classification** — crop từng box, dùng VLM embedding zero-shot (CLIP/SigLIP2) để match
@@ -33,7 +33,7 @@ working-capital cho nhà bán lẻ nhỏ / informal retailer.
 ## Status
 - [x] Detection benchmark harness: `src/detection/benchmark/` — metrics module (IoU/precision/recall,
       unit-tested), SKU-110K subset loader, wrappers for checkpoint (1b) và zero-shot (1c) candidates,
-      report + visualize scripts. Xem `docs/superpowers/plans/2026-07-17-detection-benchmark-sprint.md`.
+      report + visualize scripts.
 - [x] Detection benchmark run trên máy thật (M4 `mps`, 50 ảnh SKU-110K) → cả 1b (recall 0.17)
       và 1c (recall 0.09) đều dưới ngưỡng 0.45 → quyết định: fallback 1a (fine-tune YOLO). Xem
       `docs/detection-notes/2026-07-17-detection-benchmark-results.md`.
