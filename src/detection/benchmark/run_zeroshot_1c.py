@@ -5,9 +5,8 @@ License: Apache-2.0, public, no gated access — no API key/token needed.
 No training, no checkpoint download beyond the base model weights (~0.2B params).
 
 Known risk: no benchmark for Grounding DINO on dense/overlapping retail shelves was
-found during spec research (see docs/superpowers/specs/2026-07-17-detection-benchmark-design.md)
-— this module's smoke test is genuinely the first data point for this use case, not a
-confirmation of published results.
+found during research — this module's smoke test is genuinely the first data point
+for this use case, not a confirmation of published results.
 
 Smoke-tested 2026-07-17 on one real SKU-110K image (121 ground-truth boxes): the plan's
 suggested default box_threshold=0.3 with prompt "product." returns a single box spanning

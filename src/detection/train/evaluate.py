@@ -12,7 +12,7 @@ from src.detection.benchmark.metrics import aggregate_precision_recall, compute_
 from src.detection.train.run_trained_1a import detect_1a, load_model_1a
 
 RESULTS_PATH = Path("data/benchmark_results/results_1a.json")
-RECALL_PASS_THRESHOLD = 0.6  # per docs/superpowers/specs/2026-07-17-detection-yolo-finetune-design.md
+RECALL_PASS_THRESHOLD = 0.6  # per design decision (see docs/detection-notes/2026-07-17-yolo-finetune-results.md)
 
 
 def main():

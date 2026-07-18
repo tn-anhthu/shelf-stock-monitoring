@@ -19,9 +19,9 @@ COCO-style interpolated AP — see `src/detection/benchmark/metrics.py`.
 
 ## Decision
 
-**Fallback to 1a: fine-tune YOLO (nano) on SKU-110K**, per the decision rule in
-`docs/superpowers/specs/2026-07-17-detection-benchmark-design.md` ("nếu cả 1b và 1c đều
-không đạt ngưỡng, quay lại kế hoạch gốc — tự fine-tune YOLO nano trên SKU-110K").
+**Fallback to 1a: fine-tune YOLO (nano) on SKU-110K**, per the decision rule
+("nếu cả 1b và 1c đều không đạt ngưỡng, quay lại kế hoạch gốc — tự fine-tune YOLO nano
+trên SKU-110K").
 
 Both candidates failed the recall >= 0.45 bar by a wide margin — 1b reached 0.174 and 1c
 reached 0.093, both far below the pass threshold and well below the 1b model card's

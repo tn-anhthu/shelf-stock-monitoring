@@ -26,7 +26,7 @@ from src.detection.benchmark.run_checkpoint_1b import detect_1b, load_model_1b
 from src.detection.benchmark.run_zeroshot_1c import detect_1c, load_model_1c
 
 RESULTS_PATH = Path("data/benchmark_results/results.json")
-RECALL_PASS_THRESHOLD = 0.45  # per docs/superpowers/specs/2026-07-17-detection-benchmark-design.md
+RECALL_PASS_THRESHOLD = 0.45  # per design decision (see docs/detection-notes/2026-07-17-detection-benchmark-results.md)
 
 
 def run_benchmark(n: int = 50) -> dict:
