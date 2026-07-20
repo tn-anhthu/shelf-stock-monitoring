@@ -101,3 +101,25 @@ def list_catalog(conn: sqlite3.Connection) -> List[Dict]:
         }
         for r in rows
     ]
+
+
+def insert_scan_history(
+    conn: sqlite3.Connection,
+    image_path: str,
+    raw_result: str,
+    confirmed_result: Optional[str],
+    created_at: str,
+) -> None:
+    conn.execute(
+        "INSERT INTO scan_history (image_path, raw_result, confirmed_result, created_at) VALUES (?, ?, ?, ?)",
+        (image_path, raw_result, confirmed_result, created_at),
+    )
+    conn.commit()
+
+
+def insert_inventory_records(conn: sqlite3.Connection, records: List[Dict], scanned_at: str) -> None:
+    conn.executemany(
+        "INSERT INTO inventory (sku_id, quantity, value, status, scanned_at) VALUES (?, ?, ?, ?, ?)",
+        [(r["sku_id"], r["quantity"], r["value"], r["status"], scanned_at) for r in records],
+    )
+    conn.commit()

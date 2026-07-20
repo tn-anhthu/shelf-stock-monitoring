@@ -7,6 +7,7 @@ from src.catalog.db import (
     list_catalog,
     upsert_catalog_item,
 )
+from src.catalog.db import insert_inventory_records, insert_scan_history
 
 
 def test_create_tables_creates_catalog_inventory_scan_history():
@@ -52,3 +53,29 @@ def test_list_catalog_empty_returns_empty_list():
     conn = get_connection(":memory:")
     create_tables(conn)
     assert list_catalog(conn) == []
+
+
+def test_insert_scan_history_then_query():
+    conn = get_connection(":memory:")
+    create_tables(conn)
+    insert_scan_history(conn, image_path="data/scans/1.jpg", raw_result="{}", confirmed_result=None, created_at="2026-07-27T10:00:00")
+    rows = conn.execute("SELECT image_path, raw_result, confirmed_result FROM scan_history").fetchall()
+    assert rows == [("data/scans/1.jpg", "{}", None)]
+
+
+def test_insert_inventory_records_writes_one_row_per_sku():
+    conn = get_connection(":memory:")
+    create_tables(conn)
+    insert_inventory_records(
+        conn,
+        records=[
+            {"sku_id": "choco_pie_orion", "quantity": 5, "value": 225000, "status": "ok"},
+            {"sku_id": "coke_330", "quantity": 1, "value": 10000, "status": "low"},
+        ],
+        scanned_at="2026-07-27T10:00:00",
+    )
+    rows = conn.execute("SELECT sku_id, quantity, value, status FROM inventory").fetchall()
+    assert set(rows) == {
+        ("choco_pie_orion", 5, 225000, "ok"),
+        ("coke_330", 1, 10000, "low"),
+    }
