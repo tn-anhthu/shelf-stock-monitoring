@@ -37,6 +37,9 @@ def run_scan(
         # Week 3-4 UI crops the real image region for `box`; this pipeline module
         # only needs whatever embed_fn returns for that region, so it accepts the
         # box/image pair opaquely rather than performing the crop itself.
+        # NOTE: embed_fn here takes a (image, box) tuple for a shelf crop region.
+        # This is a different contract than src/catalog/build_embeddings.py::build_sku_embedding,
+        # which uses embed_fn(PIL.Image) for full reference images during catalog seeding.
         crop_embedding = embed_fn((image, box))
         sku_id, score = classify_crop(crop_embedding, catalog_embeddings)
         scores.append(score)
