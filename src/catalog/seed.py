@@ -7,12 +7,10 @@ Usage: python3 -m src.catalog.seed --csv path/to/catalog.csv
 import argparse
 from typing import Callable
 
-import requests
-
 from src.catalog.build_embeddings import build_sku_embedding, save_embedding
 from src.catalog.csv_loader import load_catalog_rows
 from src.catalog.db import create_tables, get_connection, upsert_catalog_item
-from src.catalog.image_fetcher import fetch_sku_images
+from src.catalog.image_fetcher import default_http_get, fetch_sku_images
 from src.classification.benchmark.embed_siglip2 import embed_image_siglip2, load_model_siglip2
 
 DEFAULT_IMAGES_DIR = "data/catalog/images"
@@ -26,7 +24,7 @@ def seed_catalog(
     embeddings_dir: str,
     db_path: str,
     embed_fn: Callable,
-    http_get: Callable = requests.get,
+    http_get: Callable = default_http_get,
 ) -> int:
     rows = load_catalog_rows(csv_path)
 
