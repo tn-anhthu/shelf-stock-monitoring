@@ -19,7 +19,7 @@ def load_model_siglip2() -> Tuple[AutoModel, AutoProcessor]:
 
 
 def embed_image_siglip2(model: AutoModel, processor: AutoProcessor, image: Image.Image) -> np.ndarray:
-    inputs = processor(images=image, return_tensors="pt").to("mps")
+    inputs = processor(images=image.convert("RGB"), return_tensors="pt").to("mps")
     with torch.no_grad():
         output = model.get_image_features(**inputs)
     return output.pooler_output[0].cpu().numpy()
