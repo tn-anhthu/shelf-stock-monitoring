@@ -1,11 +1,18 @@
 .venv-benchmark/
 .venv-train/
-.venv-classify/
+.venv-e2e/
 __pycache__/
 *.pyc
 .claude/worktrees/
 docs/superpowers/
+.superpowers/
 .pytest_cache/
+.DS_Store
+.env
+*.pt
+data/*.db
+*.log
+*.pptx
 data/benchmark_results/*
 !data/benchmark_results/.gitkeep
 !data/benchmark_results/sample_overlays/
@@ -13,7 +20,6 @@ data/benchmark_results/sample_overlays/*
 !data/benchmark_results/sample_overlays/.gitkeep
 data/yolo_train/
 runs/
-yolov8n.pt
 data/classification_results/*
 !data/classification_results/.gitkeep
 !data/classification_results/sample_crops/
