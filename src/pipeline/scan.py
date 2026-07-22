@@ -14,8 +14,11 @@ from typing import Callable, Dict, List, Optional
 
 from src.catalog.db import insert_inventory_records, insert_scan_history
 from src.pipeline.aggregate import aggregate_quantities, compute_value, flag_status
+from src.pipeline.box_filter import filter_anomalous_boxes
+from src.pipeline.box_merge import merge_adjacent_fragments
 from src.pipeline.classify import classify_crop
 from src.pipeline.confidence import is_low_confidence
+from src.pipeline.gap_detection import detect_gaps
 
 CONFIDENCE_THRESHOLD = 0.5
 
@@ -30,6 +33,9 @@ def run_scan(
 ) -> Dict:
     depth_by_index = depth_by_index or {}
     boxes = detect_fn(image)
+    boxes = merge_adjacent_fragments(boxes)
+    boxes = filter_anomalous_boxes(boxes)
+    gaps = detect_gaps(boxes)
 
     detections = []
     scores = []
@@ -52,11 +58,9 @@ def run_scan(
     quantities = aggregate_quantities(matched_detections)
     value = compute_value(quantities, catalog_items)
 
-    shelf_full_qty_by_sku = {item["sku_id"]: item["shelf_full_qty"] for item in catalog_items}
     flags = {
-        sku_id: flag_status(quantity, shelf_full_qty_by_sku[sku_id])
-        for sku_id, quantity in quantities.items()
-        if sku_id in shelf_full_qty_by_sku
+        item["sku_id"]: flag_status(quantities.get(item["sku_id"], 0), item["shelf_full_qty"])
+        for item in catalog_items
     }
 
     return {
@@ -65,6 +69,7 @@ def run_scan(
         "quantities": quantities,
         "value": value,
         "flags": flags,
+        "gaps": gaps,
     }
 
 
