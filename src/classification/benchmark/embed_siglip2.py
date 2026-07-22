@@ -23,3 +23,13 @@ def embed_image_siglip2(model: AutoModel, processor: AutoProcessor, image: Image
     with torch.no_grad():
         output = model.get_image_features(**inputs)
     return output.pooler_output[0].cpu().numpy()
+
+
+def embed_text_siglip2(model: AutoModel, processor: AutoProcessor, text: str) -> np.ndarray:
+    # get_text_features returns BaseModelOutputWithPooling in the installed transformers
+    # version, not a plain tensor — output[0] would silently grab the unpooled
+    # last_hidden_state (shape [1, seq_len, 768]) instead of the pooled embedding.
+    inputs = processor(text=[text], padding="max_length", return_tensors="pt").to("mps")
+    with torch.no_grad():
+        output = model.get_text_features(**inputs)
+    return output.pooler_output[0].cpu().numpy()
