@@ -19,6 +19,20 @@ def test_classify_crop_empty_catalog_returns_none_and_zero():
     assert score == 0.0
 
 
+def test_classify_crop_none_embedding_returns_none_and_zero():
+    catalog_embeddings = [("choco_pie_orion", np.array([1.0, 0.0]))]
+    sku_id, score = classify_crop(None, catalog_embeddings)
+    assert sku_id is None
+    assert score == 0.0
+
+
+def test_classify_crop_below_unknown_threshold_returns_none_with_real_score():
+    catalog_embeddings = [("choco_pie_orion", np.array([0.3, 0.9539392]))]
+    sku_id, score = classify_crop(np.array([1.0, 0.0]), catalog_embeddings, unknown_threshold=0.5)
+    assert sku_id is None
+    assert abs(score - 0.3) < 1e-4
+
+
 def test_load_catalog_embeddings_reads_npy_files(tmp_path):
     embedding = np.array([1.0, 2.0, 3.0])
     npy_path = tmp_path / "choco_pie_orion.npy"
