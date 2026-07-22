@@ -11,6 +11,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from PIL import Image
+import pillow_heif
+pillow_heif.register_heif_opener()
 
 from src.catalog.db import get_connection, list_catalog
 from src.classification.benchmark.embed_siglip2 import embed_image_siglip2, load_model_siglip2

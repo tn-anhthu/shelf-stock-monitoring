@@ -21,6 +21,8 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from PIL import Image
+import pillow_heif
+pillow_heif.register_heif_opener()
 
 from src.detection.train.run_trained_1a import detect_1a, load_model_1a
 from src.pipeline.gap_detection import detect_gaps
