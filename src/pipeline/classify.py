@@ -16,8 +16,12 @@ def load_catalog_embeddings(catalog_items: List[Dict]) -> List[Tuple[str, np.nda
 
 
 def classify_crop(
-    crop_embedding: np.ndarray, catalog_embeddings: List[Tuple[str, np.ndarray]]
+    crop_embedding: Optional[np.ndarray],
+    catalog_embeddings: List[Tuple[str, np.ndarray]],
+    unknown_threshold: float = 0.5,
 ) -> Tuple[Optional[str], float]:
+    if crop_embedding is None:
+        return None, 0.0
     if not catalog_embeddings:
         return None, 0.0
 
@@ -28,4 +32,7 @@ def classify_crop(
         if score > best_score:
             best_score = score
             best_sku_id = sku_id
+
+    if best_score < unknown_threshold:
+        return None, best_score
     return best_sku_id, best_score
