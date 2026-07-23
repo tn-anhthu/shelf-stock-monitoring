@@ -1,29 +1,18 @@
 # ShelfSense
 
-Trợ lý kiểm kê kệ hàng bằng ảnh chụp, dành cho cửa hàng/siêu thị mini không có ngân sách
-lắp camera cố định hay hợp đồng SaaS enterprise.
+Trợ lý kiểm kê kệ hàng bằng ảnh chụp, dành cho cửa hàng/siêu thị mini không có ngân sách lắp camera cố định hay hợp đồng SaaS enterprise.
 
-Nhân viên chụp 1 ảnh mảng kệ bằng điện thoại thường → hệ thống tự khoanh vùng, đếm số lượng từng sản phẩm, phát hiện sản phẩm sắp hết/hết hàng → hiển thị trên dashboard, không
-cần đếm tay hay dò thủ công xem kệ đang thiếu gì.
+Nhân viên chụp 1 ảnh mảng kệ bằng điện thoại thường → hệ thống tự khoanh vùng, đếm số lượng từng sản phẩm, phát hiện sản phẩm sắp hết/hết hàng → hiển thị trên dashboard, khôngcần đếm tay hay dò thủ công xem kệ đang thiếu gì.
 
 > Đây là dự án portfolio, không phải sản phẩm thương mại thật
 
 ## 1. Vấn đề
 
-Kiểm kê tồn kho trên kệ hiện chủ yếu làm thủ công: nhân viên đếm tay từng sản phẩm, dễ bỏ
-sót vị trí trống dẫn đến mất doanh thu, và không có công cụ theo dõi tình trạng kệ hàng nếu
-không đầu tư hạ tầng lớn.
+Kiểm kê tồn kho trên kệ hiện chủ yếu làm thủ công: nhân viên đếm tay từng sản phẩm, dễ bỏ sót vị trí trống dẫn đến mất doanh thu, và không có công cụ theo dõi tình trạng kệ hàng nếu không đầu tư hạ tầng lớn.
 
-Các giải pháp thị trường hiện có (Trax, Simbe Robotics/Tally, Focal Systems, AiFi, Scandit
-ShelfView...) giải quyết đúng bài toán này nhưng nhắm vào chuỗi bán lẻ lớn/FMCG enterprise -
-cần camera cố định, robot tự hành, hợp đồng dài hạn, hoặc catalog train riêng theo từng
-khách hàng. Cửa hàng/siêu thị mini không có ngân sách và quy mô để tiếp cận các giải pháp
-này.
+Các giải pháp thị trường hiện có (Trax, Simbe Robotics/Tally, Focal Systems, AiFi, Scandit ShelfView...) giải quyết đúng bài toán này nhưng nhắm vào chuỗi bán lẻ lớn/FMCG enterprise - cần camera cố định, robot tự hành, hợp đồng dài hạn, hoặc catalog train riêng theo từng khách hàng. Cửa hàng/siêu thị mini không có ngân sách và quy mô để tiếp cận các giải pháp này.
 
-**Khác biệt kỹ thuật của ShelfSense:** chỉ cần 1 ảnh chụp bằng điện thoại thường, dùng
-zero-shot classification (SigLIP2 retrieval) thay vì train riêng theo catalog của từng cửa
-hàng - thêm sản phẩm mới vào catalog không cần train lại model, khác với hướng closed-set
-classifier của nhiều đối thủ enterprise.
+**Khác biệt kỹ thuật của ShelfSense:** chỉ cần 1 ảnh chụp bằng điện thoại thường, dùng zero-shot classification (SigLIP2 retrieval) thay vì train riêng theo catalog của từng cửa hàng - thêm sản phẩm mới vào catalog không cần train lại model, khác với hướng closed-set classifier của nhiều đối thủ enterprise.
 
 
 ## 2. Research Question
@@ -31,11 +20,7 @@ classifier của nhiều đối thủ enterprise.
 
 **1. Zero-shot embedding retrieval (SigLIP2) có đủ chính xác để thay thế closed-set classifier trong catalog thay đổi liên tục không?**
 
-Đã có câu trả lời một phần. Không hoàn toàn đủ — SigLIP2 nhầm nghiêm trọng giữa các SKU
-hình dạng bao bì giống nhau (khác hãng: Pepsi/7Up/Mountain Dew; cùng hãng khác vị: Vinamilk
-có/không đường). Cosine similarity giữa cặp SKU cùng hãng khác vị (0.926) còn cao hơn cặp
-khác hãng (0.860); bản chất do image-embedding thuần không nắm bắt được khác biệt nhỏ về
-chữ/nhãn.
+Đã có câu trả lời một phần. Không hoàn toàn đủ — SigLIP2 nhầm nghiêm trọng giữa các SKU hình dạng bao bì giống nhau (khác hãng: Pepsi/7Up/Mountain Dew; cùng hãng khác vị: Vinamilk có/không đường). Cosine similarity giữa cặp SKU cùng hãng khác vị (0.926) còn cao hơn cặp khác hãng (0.860); bản chất do image-embedding thuần không nắm bắt được khác biệt nhỏ về chữ/nhãn.
 
 **2. Có thể phát hiện khoảng trống kệ (gap) chỉ bằng heuristic hình học, không cần train model riêng, hay không?**
 
@@ -49,8 +34,7 @@ chữ/nhãn.
 
 Đang chỉnh sửa. Đo IoU thật trên 29 candidate/4 ảnh xác nhận 2 loại lỗi có bản chất khác nhau: box bị chẻ (fragmentation, IoU ≈ 0.000–0.03) so với box trùng (duplicate, IoU 0.5–0.7) -> cần 2 cách sửa riêng biệt (merge theo x-overlap/y-gap/aspect ratio cho fragmentation; chỉnh tham số `iou` của NMS cho duplicate).
 
-Đối chiếu tài liệu: RQ1 và RQ3 liên quan trực tiếp đến paper #3 (ew-shot recognition) và paper #4 (Enhanced OOS Detection) — cả hai đều đối mặt vấn đề tương tự (phân biệt SKU dễ nhầm, catalog không cố định) và có thể dùng làm cơ sở đối chiếu khi viết
-phần thảo luận cho báo cáo cuối.
+Đối chiếu tài liệu: RQ1 và RQ3 liên quan trực tiếp đến paper #3 (ew-shot recognition) và paper #4 (Enhanced OOS Detection) — cả hai đều đối mặt vấn đề tương tự (phân biệt SKU dễ nhầm, catalog không cố định) và có thể dùng làm cơ sở đối chiếu khi viết phần thảo luận cho báo cáo cuối.
 
 ## 3. Scope
 
@@ -82,17 +66,16 @@ Roadmap 5 tuần (20/7 → 23/8/2026):
 | 4 (10–16/8) | Frontend Path 3 + Dashboard | Màn thêm SKU, dashboard tổng (bảng, tổng giá trị, cờ) | Có thể rút gọn Path 3 nếu trễ |
 | 5 (17–23/8) | Buffer, test, báo cáo | Test end-to-end, sửa bug, (nếu dư) trend chart, demo video, hoàn thiện báo cáo | Buffer bắt buộc, không nhét feature mới |
 
-**Thứ tự cắt nếu trễ tiến độ:** bỏ trend chart (nice-to-have) → rút gọn Path 3 → rút gọn UI
-Path 2 (giữ logic, bớt UI đẹp). Không cắt Path 1 hay database — đây là xương sống.
+**Thứ tự cắt nếu trễ tiến độ:** bỏ trend chart (nice-to-have) → rút gọn Path 3 → rút gọn UI Path 2 (giữ logic, bớt UI đẹp). Không cắt Path 1 hay database — đây là xương sống.
 
 ## Trạng thái hiện tại
 
 - [x] **Detection** — benchmark harness (`src/detection/benchmark/`: metrics IoU/precision/recall, SKU-110K loader, checkpoint/zero-shot candidates) → cả hai candidate benchmark dưới ngưỡng 0.45 → fine-tune YOLO nano riêng (recall 0.782, precision 0.745, ngưỡng 0.6 đạt). Xem `docs/detection-notes/`.
 - [x] **Classification** — benchmark CLIP vs SigLIP2 zero-shot retrieval trên subset RPC — SigLIP2 top-1 0.676, top-5 0.952, chọn SigLIP2 cho retrieval. Xem `docs/classification-notes/`.
 - [x] **Catalog** (`src/catalog/`) — schema SQLite (catalog/inventory/scan_history), parse CSV seed, fetch ảnh mẫu từ URL, build + lưu embedding SigLIP2 theo SKU, orchestrator seed catalog đầy đủ.
-- [x] **Pipeline lõi** (`src/pipeline/`) — classify crop theo catalog, flag low-confidence, aggregate số lượng/giá trị/cờ tồn kho, orchestrator `run_scan`/`persist_scan` nối detect → classify → confidence → aggregate → ghi SQLite.
+- [ ] **Pipeline lõi** (`src/pipeline/`) — classify crop theo catalog, flag low-confidence, aggregate số lượng/giá trị/cờ tồn kho, orchestrator `run_scan`/`persist_scan` nối detect → classify → confidence → aggregate → ghi SQLite.
 - [x] **Detection post-processing** — merge box vỡ (`merge_adjacent_fragments`), lọc box rác (`filter_anomalous_boxes`), gap detection theo hàng kệ — đã wire vào `run_scan`.
-- [~] **LLM escalation** (RQ3) — experiment harness xong (multi-image reference-photo mode, hỗ trợ input HEIC); production integration (`escalate_to_llm` gắn vào `classify_crop`) đang làm.
+- [ ] **LLM escalation** (RQ3) — experiment harness xong (multi-image reference-photo mode, hỗ trợ input HEIC); production integration (`escalate_to_llm` gắn vào `classify_crop`) đang làm.
 - [ ] Frontend Streamlit/Gradio (Path 1/2/3) — chưa bắt đầu, theo roadmap là việc của tuần 3-4.
 - [ ] Dashboard tổng hợp.
 
