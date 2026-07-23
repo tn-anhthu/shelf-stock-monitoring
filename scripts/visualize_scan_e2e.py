@@ -21,14 +21,27 @@ Must run on the M4 MacBook Pro (needs mps + network access for the SigLIP2
 download) — the checkpoint path above matches what's actually on disk today
 (nested runs/detect/runs/train_1a/..., not runs/train_1a/... as written in some
 earlier notes; run `find runs -iname best.pt` to confirm before running).
+
+API key is read from the ANTHROPIC_API_KEY environment variable — either
+export it yourself before running, or put it in a .env file (ANTHROPIC_API_KEY=...,
+gitignored) and it's auto-loaded via python-dotenv if that package is
+installed. Never hardcode the key into this or any other file.
 """
 import argparse
 import math
+import os
 import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass
+
+import anthropic
 from PIL import Image, ImageDraw
 import pillow_heif
 pillow_heif.register_heif_opener()
@@ -36,16 +49,23 @@ pillow_heif.register_heif_opener()
 from src.catalog.db import get_connection, list_catalog
 from src.classification.benchmark.embed_siglip2 import embed_image_siglip2, load_model_siglip2
 from src.detection.train.run_trained_1a import detect_1a, load_model_1a
-from src.pipeline.classify import classify_crop, load_catalog_embeddings
+from src.pipeline.box_filter import filter_anomalous_boxes
+from src.pipeline.box_merge import merge_adjacent_fragments
+from src.pipeline.classify import classify_crops_parallel, load_catalog_embeddings, rank_candidates
 from src.pipeline.confidence import is_low_confidence
 from src.pipeline.crop import crop_box
 from src.pipeline.gap_detection import detect_gaps
+from src.pipeline.review_export import append_review_sheet
 
 DEFAULT_DB_PATH = "data/shelfsense.db"
-# Same placeholder as classify_crop's default — no real data to tune this against
-# yet, this script's own output (the score trace printed per box) is exactly what
-# you use to pick a real number afterwards.
-DEFAULT_UNKNOWN_THRESHOLD = 0.5
+DEFAULT_TOP_K = 5
+DEFAULT_MAX_WORKERS = 10
+REVIEW_XLSX_PATH = "data/scan_viz/review.xlsx"
+
+# Claude Haiku 4.5 pricing (https://docs.claude.com/en/docs/about-claude/pricing), per
+# million tokens — used to turn this run's summed usage into a rough dollar estimate.
+HAIKU_INPUT_COST_PER_MTOK = 1.0
+HAIKU_OUTPUT_COST_PER_MTOK = 5.0
 
 MATCHED_COLOR = (0, 200, 0)
 UNKNOWN_COLOR = (220, 30, 30)
@@ -97,8 +117,13 @@ def main():
     parser.add_argument("--weights", type=str, required=True)
     parser.add_argument("--db", type=str, default=DEFAULT_DB_PATH)
     parser.add_argument("--out", type=str, default="data/scan_viz/run1")
-    parser.add_argument("--unknown-threshold", type=float, default=DEFAULT_UNKNOWN_THRESHOLD)
+    parser.add_argument("--top-k", type=int, default=DEFAULT_TOP_K)
+    parser.add_argument("--max-workers", type=int, default=DEFAULT_MAX_WORKERS)
     args = parser.parse_args()
+
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        raise SystemExit("ANTHROPIC_API_KEY not set — export it before running this script.")
+    llm_client = anthropic.Anthropic()
 
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -117,26 +142,54 @@ def main():
     boxes = detect_1a(yolo_model, shelf_image)
     print(f"YOLO detected {len(boxes)} boxes")
 
+    boxes_merged = merge_adjacent_fragments(boxes)
+    print(f"After merge_adjacent_fragments: {len(boxes)} -> {len(boxes_merged)} boxes")
+
+    boxes = filter_anomalous_boxes(boxes_merged)
+    print(f"After filter_anomalous_boxes: {len(boxes_merged)} -> {len(boxes)} boxes")
+
     gaps = detect_gaps(boxes)
     print(f"Gap detection flagged {len(gaps)} suspicious gap(s)")
     for gx1, gy1, gx2, gy2 in gaps:
         print(f"  gap: box_coords={tuple(round(v) for v in (gx1, gy1, gx2, gy2))}")
 
-    per_box_results = []
-    crop_thumbs, crop_labels = [], []
-
+    # Phase 1 (sequential): crop + save + embed + cosine-rank candidates per
+    # box. Stays sequential since embed_image_siglip2 shares one SigLIP2
+    # model/GPU across boxes.
+    pending = []  # (i, box, cropped, crop_status, ranked)
     for i, box in enumerate(boxes):
         cropped = crop_box(shelf_image, box)
         crop_status = "degenerate" if cropped is None else "ok"
 
-        embedding = None
+        ranked = []
         if cropped is not None:
             crop_path = out_dir / f"crop_{i:02d}_{crop_status}.jpg"
             cropped.convert("RGB").save(crop_path)
             embedding = embed_image_siglip2(siglip_model, siglip_processor, cropped)
+            ranked = rank_candidates(embedding, catalog_embeddings, top_k=args.top_k)
 
-        sku_id, score = classify_crop(embedding, catalog_embeddings, unknown_threshold=args.unknown_threshold)
-        per_box_results.append({"box": box, "sku_id": sku_id, "score": score, "crop_status": crop_status})
+        pending.append((i, box, cropped, crop_status, ranked))
+
+    # Phase 2 (parallel): verify every box's candidate shortlist with the LLM
+    # concurrently — network I/O, not GPU/CPU-bound, so a thread pool is
+    # enough. classify_crops_parallel preserves the input order above
+    # regardless of which thread finishes first.
+    llm_results = classify_crops_parallel(
+        [(cropped, ranked) for _, _, cropped, _, ranked in pending],
+        catalog_items,
+        llm_client,
+        max_workers=args.max_workers,
+    )
+
+    per_box_results = []
+    crop_thumbs, crop_labels = [], []
+    total_input_tokens, total_output_tokens = 0, 0
+    for (i, box, cropped, crop_status, _ranked), (sku_id, score, reasoning, usage) in zip(pending, llm_results):
+        per_box_results.append({
+            "box": box, "sku_id": sku_id, "score": score, "crop_status": crop_status, "reasoning": reasoning,
+        })
+        total_input_tokens += usage["input_tokens"]
+        total_output_tokens += usage["output_tokens"]
 
         tag = sku_id or "UNKNOWN"
         print(f"  box {i:02d}: {tag:<25s} score={score:.3f}  crop={crop_status}  box_coords={tuple(round(v) for v in box)}")
@@ -150,7 +203,7 @@ def main():
 
     scores = [r["score"] for r in per_box_results]
     if scores:
-        region_low_conf = is_low_confidence(scores)
+        region_low_conf = is_low_confidence(per_box_results)
         avg = sum(scores) / len(scores)
         unknown_count = sum(1 for r in per_box_results if r["sku_id"] is None)
         print(f"\nAvg confidence: {avg:.3f}  |  region-level low_confidence flag: {region_low_conf}")
@@ -158,8 +211,37 @@ def main():
     else:
         print("\nNo detections — nothing to score.")
 
+    estimated_cost = (
+        total_input_tokens / 1_000_000 * HAIKU_INPUT_COST_PER_MTOK
+        + total_output_tokens / 1_000_000 * HAIKU_OUTPUT_COST_PER_MTOK
+    )
+    print(
+        f"LLM token usage: {total_input_tokens} input, {total_output_tokens} output "
+        f"-> estimated cost ${estimated_cost:.4f}"
+    )
+
     print(f"\nSaved to {out_dir}/: 0_original.jpg, 1_annotated.jpg, 2_crops_grid.jpg, "
           f"{sum(1 for r in per_box_results if r['crop_status'] == 'ok')} individual crop files")
+
+    review_rows = [
+        {
+            "index": i,
+            "crop_file": f"crop_{i:02d}_ok.jpg" if r["crop_status"] == "ok" else "",
+            "predicted_sku_id": r["sku_id"],
+            "score": r["score"],
+            "llm_reasoning": r["reasoning"],
+            "correct": "",
+            "true_sku_id": "",
+            "depth": 1,
+        }
+        for i, r in enumerate(per_box_results)
+    ]
+    try:
+        Path(REVIEW_XLSX_PATH).parent.mkdir(parents=True, exist_ok=True)
+        used_sheet_name = append_review_sheet(REVIEW_XLSX_PATH, out_dir.name, review_rows)
+    except RuntimeError as e:
+        raise SystemExit(str(e))
+    print(f"Review sheet '{used_sheet_name}' appended to {REVIEW_XLSX_PATH}")
 
 
 if __name__ == "__main__":

@@ -1,12 +1,53 @@
 import json
+import time
+from types import SimpleNamespace
 
 import numpy as np
+from PIL import Image
 
 from src.catalog.db import create_tables, get_connection
 from src.pipeline.box_filter import filter_anomalous_boxes
 from src.pipeline.box_merge import merge_adjacent_fragments
 from src.pipeline.gap_detection import detect_gaps
 from src.pipeline.scan import persist_scan, run_scan
+
+FAKE_IMAGE = Image.new("RGB", (200, 200))
+
+
+FAKE_USAGE = SimpleNamespace(input_tokens=100, output_tokens=20)
+
+
+class FakeMessages:
+    def __init__(self, answer):
+        self.answer = answer
+        self.calls = []
+
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+        text = json.dumps({"answer": self.answer})
+        return SimpleNamespace(content=[SimpleNamespace(type="text", text=text)], usage=FAKE_USAGE)
+
+
+class FakeLLMClient:
+    def __init__(self, answer):
+        self.messages = FakeMessages(answer)
+
+
+class DelayedFakeMessages:
+    def __init__(self, answer, delay):
+        self.answer = answer
+        self.delay = delay
+
+    def create(self, **kwargs):
+        time.sleep(self.delay)
+        return SimpleNamespace(
+            content=[SimpleNamespace(type="text", text=json.dumps({"answer": self.answer}))], usage=FAKE_USAGE
+        )
+
+
+class DelayedFakeLLMClient:
+    def __init__(self, answer, delay):
+        self.messages = DelayedFakeMessages(answer, delay)
 
 
 def fake_detect_fn(image):
@@ -37,11 +78,12 @@ def test_run_scan_produces_quantities_value_and_flags():
     catalog_embeddings = [("choco_pie_orion", np.array([1.0, 0.0]))]
 
     result = run_scan(
-        image=None,
+        image=FAKE_IMAGE,
         catalog_items=catalog_items,
         catalog_embeddings=catalog_embeddings,
         detect_fn=fake_detect_fn,
         embed_fn=fake_embed_fn,
+        llm_client=FakeLLMClient(answer="choco_pie_orion"),
     )
 
     assert result["quantities"] == {"choco_pie_orion": 2}
@@ -56,11 +98,12 @@ def test_run_scan_applies_depth_multiplier_by_box_index():
     catalog_embeddings = [("choco_pie_orion", np.array([1.0, 0.0]))]
 
     result = run_scan(
-        image=None,
+        image=FAKE_IMAGE,
         catalog_items=catalog_items,
         catalog_embeddings=catalog_embeddings,
         detect_fn=fake_detect_fn,
         embed_fn=fake_embed_fn,
+        llm_client=FakeLLMClient(answer="choco_pie_orion"),
         depth_by_index={0: 3, 1: 1},
     )
 
@@ -74,11 +117,12 @@ def test_run_scan_merges_and_filters_boxes_before_classify_and_gaps():
     catalog_embeddings = [("choco_pie_orion", np.array([1.0, 0.0]))]
 
     result = run_scan(
-        image=None,
+        image=FAKE_IMAGE,
         catalog_items=catalog_items,
         catalog_embeddings=catalog_embeddings,
         detect_fn=fake_detect_fn_with_fragments,
         embed_fn=fake_embed_fn,
+        llm_client=FakeLLMClient(answer="choco_pie_orion"),
     )
 
     cleaned_boxes = filter_anomalous_boxes(merge_adjacent_fragments(fake_detect_fn_with_fragments(None)))
@@ -94,11 +138,12 @@ def test_run_scan_includes_gaps_from_detected_boxes():
     catalog_embeddings = [("choco_pie_orion", np.array([1.0, 0.0]))]
 
     result = run_scan(
-        image=None,
+        image=FAKE_IMAGE,
         catalog_items=catalog_items,
         catalog_embeddings=catalog_embeddings,
         detect_fn=fake_detect_fn,
         embed_fn=fake_embed_fn,
+        llm_client=FakeLLMClient(answer="choco_pie_orion"),
     )
 
     assert result["gaps"] == detect_gaps(fake_detect_fn(None))
@@ -112,11 +157,12 @@ def test_run_scan_flags_undetected_catalog_sku_as_out():
     catalog_embeddings = [("choco_pie_orion", np.array([1.0, 0.0]))]
 
     result = run_scan(
-        image=None,
+        image=FAKE_IMAGE,
         catalog_items=catalog_items,
         catalog_embeddings=catalog_embeddings,
         detect_fn=fake_detect_fn,
         embed_fn=fake_embed_fn,
+        llm_client=FakeLLMClient(answer="choco_pie_orion"),
     )
 
     assert result["flags"]["coke_330"] == "out"
@@ -124,14 +170,72 @@ def test_run_scan_flags_undetected_catalog_sku_as_out():
 
 def test_run_scan_flags_low_confidence_when_no_catalog_match():
     result = run_scan(
-        image=None,
+        image=FAKE_IMAGE,
         catalog_items=[],
         catalog_embeddings=[],
         detect_fn=fake_detect_fn,
         embed_fn=fake_embed_fn,
+        llm_client=FakeLLMClient(answer="choco_pie_orion"),
     )
     assert result["low_confidence"] is True
     assert result["quantities"] == {}
+
+
+def test_run_scan_skips_embed_and_classify_for_degenerate_crop():
+    # Box fully outside the 200x200 FAKE_IMAGE bounds -> crop_box returns None.
+    def detect_fn_out_of_bounds(image):
+        return [(300, 300, 310, 310)]
+
+    embed_calls = []
+
+    def tracking_embed_fn(crop_image):
+        embed_calls.append(crop_image)
+        return np.array([1.0, 0.0])
+
+    llm_client = FakeLLMClient(answer="choco_pie_orion")
+
+    result = run_scan(
+        image=FAKE_IMAGE,
+        catalog_items=[{"sku_id": "choco_pie_orion", "name": "Chocopie", "price": 45000, "shelf_full_qty": 10}],
+        catalog_embeddings=[("choco_pie_orion", np.array([1.0, 0.0]))],
+        detect_fn=detect_fn_out_of_bounds,
+        embed_fn=tracking_embed_fn,
+        llm_client=llm_client,
+    )
+
+    assert result["detections"] == [{"sku_id": None, "confidence": 0.0, "depth": 1}]
+    assert embed_calls == []
+    assert llm_client.messages.calls == []
+
+
+def test_run_scan_verifies_boxes_with_llm_in_parallel_not_sequentially():
+    def detect_fn_five_separate_boxes(image):
+        # Well-separated (y-gap > row_cluster_tolerance) so merge/filter/gap
+        # logic doesn't interact with them - this test is only about phase 2
+        # (LLM verification) actually running concurrently across boxes.
+        return [(0, 0, 10, 10), (0, 30, 10, 40), (0, 60, 10, 70), (0, 90, 10, 100), (0, 120, 10, 130)]
+
+    catalog_items = [{"sku_id": "choco_pie_orion", "name": "Chocopie", "price": 45000, "shelf_full_qty": 10}]
+    catalog_embeddings = [("choco_pie_orion", np.array([1.0, 0.0]))]
+    delay = 0.2
+    llm_client = DelayedFakeLLMClient(answer="choco_pie_orion", delay=delay)
+
+    start = time.monotonic()
+    result = run_scan(
+        image=FAKE_IMAGE,
+        catalog_items=catalog_items,
+        catalog_embeddings=catalog_embeddings,
+        detect_fn=detect_fn_five_separate_boxes,
+        embed_fn=fake_embed_fn,
+        llm_client=llm_client,
+        max_workers=5,
+    )
+    elapsed = time.monotonic() - start
+
+    assert len(result["detections"]) == 5
+    assert result["quantities"] == {"choco_pie_orion": 5}
+    # sequential would take 5 * delay (1.0s); parallel should be well under half that.
+    assert elapsed < delay * 5 / 2
 
 
 def test_persist_scan_writes_scan_history_and_inventory_rows(tmp_path):

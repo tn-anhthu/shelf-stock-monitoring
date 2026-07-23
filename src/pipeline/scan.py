@@ -10,14 +10,15 @@ inventory — run_scan() itself never writes to the database.
 """
 import json
 from datetime import datetime, timezone
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
 from src.catalog.db import insert_inventory_records, insert_scan_history
 from src.pipeline.aggregate import aggregate_quantities, compute_value, flag_status
 from src.pipeline.box_filter import filter_anomalous_boxes
 from src.pipeline.box_merge import merge_adjacent_fragments
-from src.pipeline.classify import classify_crop
+from src.pipeline.classify import classify_crops_parallel, rank_candidates
 from src.pipeline.confidence import is_low_confidence
+from src.pipeline.crop import crop_box
 from src.pipeline.gap_detection import detect_gaps
 
 CONFIDENCE_THRESHOLD = 0.5
@@ -29,7 +30,11 @@ def run_scan(
     catalog_embeddings,
     detect_fn: Callable,
     embed_fn: Callable,
+    llm_client,
     depth_by_index: Optional[Dict[int, int]] = None,
+    top_k: int = 5,
+    images_dir: str = "data/catalog/images",
+    max_workers: int = 10,
 ) -> Dict:
     depth_by_index = depth_by_index or {}
     boxes = detect_fn(image)
@@ -37,22 +42,46 @@ def run_scan(
     boxes = filter_anomalous_boxes(boxes)
     gaps = detect_gaps(boxes)
 
-    detections = []
-    scores = []
+    # Phase 1 (sequential): crop + embed + cosine-rank candidates per box.
+    # Stays sequential because embed_fn shares the SigLIP2 model/GPU across
+    # boxes; a degenerate crop (box.crop_box returns None) is resolved here
+    # directly without ever touching embed_fn or the LLM.
+    detections: List[Optional[Dict]] = [None] * len(boxes)
+    pending: List[Tuple[int, int, object, List[Tuple[str, float]]]] = []
     for i, box in enumerate(boxes):
-        # Week 3-4 UI crops the real image region for `box`; this pipeline module
-        # only needs whatever embed_fn returns for that region, so it accepts the
-        # box/image pair opaquely rather than performing the crop itself.
-        # NOTE: embed_fn here takes a (image, box) tuple for a shelf crop region.
-        # This is a different contract than src/catalog/build_embeddings.py::build_sku_embedding,
-        # which uses embed_fn(PIL.Image) for full reference images during catalog seeding.
-        crop_embedding = embed_fn((image, box))
-        sku_id, score = classify_crop(crop_embedding, catalog_embeddings)
-        scores.append(score)
         depth = depth_by_index.get(i, 1)
-        detections.append({"sku_id": sku_id, "confidence": score, "depth": depth})
+        cropped = crop_box(image, box)
+        if cropped is None:
+            detections[i] = {"sku_id": None, "confidence": 0.0, "depth": depth}
+            continue
 
-    low_confidence = is_low_confidence(scores, threshold=CONFIDENCE_THRESHOLD)
+        # embed_fn(PIL.Image) -> np.ndarray — same contract as
+        # src/catalog/build_embeddings.py::build_sku_embedding uses for catalog
+        # reference images, now that run_scan crops the region itself instead
+        # of leaving that to embed_fn.
+        crop_embedding = embed_fn(cropped)
+        ranked = rank_candidates(crop_embedding, catalog_embeddings, top_k=top_k)
+        pending.append((i, depth, cropped, ranked))
+
+    # Phase 2 (parallel): verify each pending box's candidates with the LLM —
+    # network I/O, not GPU/CPU-bound, so a thread pool is enough. Order is
+    # preserved by classify_crops_parallel regardless of thread completion
+    # order, which matters here since `i` drives depth_by_index/detections.
+    llm_results = classify_crops_parallel(
+        [(cropped, ranked) for _, _, cropped, ranked in pending],
+        catalog_items,
+        llm_client,
+        images_dir=images_dir,
+        max_workers=max_workers,
+    )
+    # reasoning/usage are discarded here — reasoning is for human review via
+    # scripts/visualize_scan_e2e.py + data/scan_viz/review.xlsx, and usage
+    # (token cost tracking) is aggregated there too; neither is persisted to
+    # scan_history/inventory.
+    for (i, depth, _, _), (sku_id, score, _reasoning, _usage) in zip(pending, llm_results):
+        detections[i] = {"sku_id": sku_id, "confidence": score, "depth": depth}
+
+    low_confidence = is_low_confidence(detections, threshold=CONFIDENCE_THRESHOLD)
 
     matched_detections = [d for d in detections if d["sku_id"] is not None]
     quantities = aggregate_quantities(matched_detections)

@@ -31,8 +31,13 @@ def seed_catalog(
     conn = get_connection(db_path)
     create_tables(conn)
 
+    seeded_count = 0
     for row in rows:
         image_paths = fetch_sku_images(row["sku_id"], row["image_urls"], images_dir, http_get=http_get)
+        if not image_paths:
+            print(f"[seed_catalog] skipping {row['sku_id']}: no valid images fetched")
+            continue
+
         embedding = build_sku_embedding(image_paths, embed_fn=embed_fn)
         embedding_path = save_embedding(embedding, row["sku_id"], embeddings_dir)
         upsert_catalog_item(
@@ -43,8 +48,9 @@ def seed_catalog(
             shelf_full_qty=row["shelf_full_qty"],
             embedding_path=embedding_path,
         )
+        seeded_count += 1
 
-    return len(rows)
+    return seeded_count
 
 
 def main():

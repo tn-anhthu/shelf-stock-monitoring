@@ -1,4 +1,11 @@
-"""LLM escalation experiment: when SigLIP2's top-1/top-2 candidates are too
+"""One-off experiment script — NOT part of the production pipeline. This is
+what established that LLM verification helps and roughly how to prompt it;
+see src/pipeline/classify.py (classify_crop) and src/pipeline/llm_escalation.py
+(escalate_to_llm) for the production version that's actually wired into
+src/pipeline/scan.py::run_scan. Kept as-is since it's the evidence behind that
+design decision, not because it should be extended further.
+
+LLM escalation experiment: when SigLIP2's top-1/top-2 candidates are too
 close (see the earlier text-embedding experiment, which failed for this
 exact reason), ask Claude Haiku 4.5 to pick the right sku_id from a short
 shortlist using the crop image directly, or say "unknown" when it can't
