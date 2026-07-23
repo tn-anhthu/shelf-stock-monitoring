@@ -22,6 +22,7 @@ def main():
     parser.add_argument("--imgsz", type=int, default=640)
     parser.add_argument("--device", type=str, default="mps")
     parser.add_argument("--name", type=str, default="pilot")
+    parser.add_argument("--model", type=str, default="yolov8n.pt")
     parser.add_argument("--close-mosaic", type=int, default=10,
                          help="Disable mosaic augmentation for the last N epochs (ultralytics "
                               "default: 10). If N >= --epochs, mosaic is disabled almost the "
@@ -31,7 +32,7 @@ def main():
     print(f"Materializing {args.n_train} train / {args.n_val} val images...")
     data_yaml = materialize_yolo_dataset(args.n_train, args.n_val, DATA_DIR)
 
-    model = YOLO("yolov8n.pt")
+    model = YOLO(args.model)
     start = time.time()
     model.train(
         data=str(data_yaml),

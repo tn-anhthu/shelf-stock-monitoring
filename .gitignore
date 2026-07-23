@@ -1,21 +1,46 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Virtualenvs (4 bộ riêng do dependency ghim version đá nhau, xem README Setup)
 .venv-benchmark/
 .venv-train/
 .venv-classify/
-__pycache__/
-*.pyc
-.claude/worktrees/
-docs/superpowers/
-.pytest_cache/
+.venv-e2e/
+
+# Env / secrets
+.env
+
+# OS
+.DS_Store
+
+# Model checkpoints & run logs
+*.pt
+*.log
+*.pptx
+runs/
+
+# Data — output pipeline sinh ra, giữ lại input gốc/ground-truth
+data/*.db
+data/yolo_train/
 data/benchmark_results/*
 !data/benchmark_results/.gitkeep
 !data/benchmark_results/sample_overlays/
 data/benchmark_results/sample_overlays/*
 !data/benchmark_results/sample_overlays/.gitkeep
-data/yolo_train/
-runs/
-yolov8n.pt
 data/classification_results/*
 !data/classification_results/.gitkeep
 !data/classification_results/sample_crops/
 data/classification_results/sample_crops/*
 !data/classification_results/sample_crops/.gitkeep
+data/catalog/*
+!data/catalog/catalog_seed.csv
+data/scan_viz/*
+!data/scan_viz/input/
+!data/scan_viz/review.xlsx
+
+# Dev tooling (local-only)
+.claude/worktrees/
+docs/superpowers/
+.superpowers/
