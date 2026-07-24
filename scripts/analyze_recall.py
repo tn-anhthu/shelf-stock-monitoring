@@ -49,7 +49,7 @@ def analyze_recall(xlsx_path: str, sheet_name: str) -> Dict[str, List]:
 
         candidate_skus = parse_candidates(row[col["top5_candidates"]] or "")
         index = row[col["index"]]
-        if true_sku_id in candidate_skus:
+        if true_sku_id.lower() in {sku.lower() for sku in candidate_skus}:
             reasoning_failures.append(index)
         else:
             retrieval_failures.append(index)
