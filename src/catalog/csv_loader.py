@@ -1,5 +1,5 @@
 """Parse the catalog CSV (exported from the Google Sheet used to bulk-seed the
-initial ~15-30 SKU catalog, per docs/superpowers/specs/2026-07-20-shelfsense-mvp-design.md
+initial ~15-30 SKU catalog, per docs/specs/mvp-design.md
 section 10) into plain dicts ready for image fetching and DB insertion.
 """
 import csv

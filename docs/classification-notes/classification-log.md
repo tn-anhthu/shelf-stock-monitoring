@@ -21,4 +21,4 @@ Chênh lệch quá lớn để cân nhắc yếu tố phụ (thời gian suy lu�
 
 ## Bước tiếp theo (đã thực hiện ở Phase 3 — ShelfSense MVP)
 
-Tích hợp SigLIP2 embedding retrieval với catalog nhỏ tự tạo (không dùng RPC làm catalog chính thức nữa, xem `docs/superpowers/specs/2026-07-20-shelfsense-mvp-design.md` phần Catalog) — RPC chỉ còn dùng làm bộ benchmark tham khảo cho quyết định chọn model ở trên.
+Tích hợp SigLIP2 embedding retrieval với catalog nhỏ tự tạo (không dùng RPC làm catalog chính thức nữa, xem `docs/specs/mvp-design.md` phần Catalog) — RPC chỉ còn dùng làm bộ benchmark tham khảo cho quyết định chọn model ở trên.

@@ -1,5 +1,5 @@
 """SQLite schema and CRUD helpers for the ShelfSense catalog, inventory, and scan
-history. Single-file local database per docs/superpowers/specs/2026-07-20-shelfsense-mvp-design.md
+history. Single-file local database per docs/specs/mvp-design.md
 section 9 (SQLite, not Supabase/cloud — this app runs local, no multi-user need).
 """
 import sqlite3

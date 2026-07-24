@@ -1,6 +1,6 @@
 """Orchestrate catalog seeding: CSV row -> fetch images -> build embedding -> upsert
 into SQLite. This is the script Thư runs after editing the Google Sheet CSV, per
-docs/superpowers/specs/2026-07-20-shelfsense-mvp-design.md section 10/Week 1.
+docs/specs/mvp-design.md section 10/Week 1.
 
 Usage: python3 -m src.catalog.seed --csv path/to/catalog.csv
 """

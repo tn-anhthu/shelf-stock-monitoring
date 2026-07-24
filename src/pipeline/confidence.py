@@ -1,5 +1,5 @@
 """Flag a shelf region for re-shoot when its average classification confidence is
-too low to trust — Path 2 of docs/superpowers/specs/2026-07-20-shelfsense-mvp-design.md
+too low to trust — Path 2 of docs/specs/mvp-design.md
 section 7 (Acceptance Criteria).
 """
 from typing import List

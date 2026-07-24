@@ -2,7 +2,7 @@
 catalog -> flag low-confidence -> aggregate quantities/value/stock flags ->
 persist the confirmed result. This is the module the Streamlit/Gradio UI (a
 later, separate plan for Week 3-4) calls directly for Path 1/Path 2 of
-docs/superpowers/specs/2026-07-20-shelfsense-mvp-design.md section 7.
+docs/specs/mvp-design.md section 7.
 
 Per that spec's General A/C: results from run_scan() are a DRAFT. Only
 persist_scan() (called after the employee confirms in the UI) writes to
