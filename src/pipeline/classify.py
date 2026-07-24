@@ -56,14 +56,19 @@ def verify_with_llm(
     catalog_items: List[Dict],
     llm_client,
     images_dir: str = "data/catalog/images",
-) -> Tuple[Optional[str], float, str, Dict[str, int]]:
-    """Returns (sku_id, score, reasoning, usage). reasoning is escalate_to_llm's
+) -> Tuple[Optional[str], float, str, Dict[str, int], List[Tuple[str, float]]]:
+    """Returns (sku_id, score, reasoning, usage, ranked). reasoning is escalate_to_llm's
     own explanation for the answer — for human review/debugging (see
     data/scan_viz/review.xlsx's llm_reasoning column), not used in any
     decision here. usage is escalate_to_llm's token count, for cost tracking
-    in scripts/visualize_scan_e2e.py."""
+    in scripts/visualize_scan_e2e.py. ranked is the same top-k (sku_id,
+    score) shortlist passed in as the `ranked` argument — returned so
+    callers can log which SKUs SigLIP2 actually shortlisted for the LLM
+    (see data/scan_viz/review.xlsx's top5_candidates column), to separate
+    retrieval failures (true SKU never reached the shortlist) from
+    reasoning failures (it did, but the LLM still picked wrong)."""
     if not ranked:
-        return None, 0.0, "", dict(ZERO_USAGE)
+        return None, 0.0, "", dict(ZERO_USAGE), []
 
     names_by_sku = {item["sku_id"]: item.get("name", item["sku_id"]) for item in catalog_items}
     candidates = [(sku_id, names_by_sku.get(sku_id, sku_id)) for sku_id, _ in ranked]
@@ -71,9 +76,9 @@ def verify_with_llm(
     answer, reasoning, usage = escalate_to_llm(llm_client, crop_image, candidates, images_dir=images_dir)
 
     if answer == "unknown":
-        return None, ranked[0][1], reasoning, usage
+        return None, ranked[0][1], reasoning, usage, ranked
     matched_score = next(score for sku_id, score in ranked if sku_id == answer)
-    return answer, matched_score, reasoning, usage
+    return answer, matched_score, reasoning, usage, ranked
 
 
 def classify_crop(
@@ -84,7 +89,7 @@ def classify_crop(
     llm_client,
     top_k: int = 5,
     images_dir: str = "data/catalog/images",
-) -> Tuple[Optional[str], float, str, Dict[str, int]]:
+) -> Tuple[Optional[str], float, str, Dict[str, int], List[Tuple[str, float]]]:
     ranked = rank_candidates(crop_embedding, catalog_embeddings, top_k=top_k)
     return verify_with_llm(crop_image, ranked, catalog_items, llm_client, images_dir=images_dir)
 
@@ -95,7 +100,7 @@ def classify_crops_parallel(
     llm_client,
     images_dir: str = "data/catalog/images",
     max_workers: int = 10,
-) -> List[Tuple[Optional[str], float, str, Dict[str, int]]]:
+) -> List[Tuple[Optional[str], float, str, Dict[str, int], List[Tuple[str, float]]]]:
     """Run verify_with_llm for every (crop_image, ranked) pair concurrently.
 
     Preserves input order regardless of which thread finishes first (relies
@@ -104,12 +109,12 @@ def classify_crops_parallel(
     detections back up with their original box index. One item's LLM call
     failing (timeout, rate limit, malformed JSON surviving escalate_to_llm's
     own retries) never crashes the batch: it's logged and that item falls
-    back to (None, top1_score, <error note>, zero usage) instead — a failed
-    call's actual token usage (if any was billed before the failure) isn't
-    recoverable here, so it's excluded from the cost estimate rather than
-    guessed. llm_client is assumed thread-safe for concurrent calls, same as
-    any standard HTTP client (anthropic.Anthropic is, via its underlying
-    httpx connection pool).
+    back to (None, top1_score, <error note>, zero usage, its own ranked
+    shortlist) instead — a failed call's actual token usage (if any was
+    billed before the failure) isn't recoverable here, so it's excluded from
+    the cost estimate rather than guessed. llm_client is assumed thread-safe
+    for concurrent calls, same as any standard HTTP client
+    (anthropic.Anthropic is, via its underlying httpx connection pool).
     """
 
     def _run(item):
@@ -120,7 +125,7 @@ def classify_crops_parallel(
             fallback_score = ranked[0][1] if ranked else 0.0
             note = f"LLM verification failed: {e!r}"
             print(f"classify_crops_parallel: {note}, falling back to unknown (score={fallback_score:.3f})")
-            return None, fallback_score, note, dict(ZERO_USAGE)
+            return None, fallback_score, note, dict(ZERO_USAGE), ranked
 
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         return list(executor.map(_run, items))

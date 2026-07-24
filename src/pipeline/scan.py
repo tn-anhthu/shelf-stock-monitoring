@@ -14,7 +14,7 @@ from typing import Callable, Dict, List, Optional, Tuple
 
 from src.catalog.db import insert_inventory_records, insert_scan_history
 from src.pipeline.aggregate import aggregate_quantities, compute_value, flag_status
-from src.pipeline.box_filter import filter_anomalous_boxes
+from src.pipeline.box_filter import filter_anomalous_boxes, filter_contained_boxes
 from src.pipeline.box_merge import merge_adjacent_fragments
 from src.pipeline.classify import classify_crops_parallel, rank_candidates
 from src.pipeline.confidence import is_low_confidence
@@ -40,6 +40,7 @@ def run_scan(
     boxes = detect_fn(image)
     boxes = merge_adjacent_fragments(boxes)
     boxes = filter_anomalous_boxes(boxes)
+    boxes, flagged_regions = filter_contained_boxes(boxes)
     gaps = detect_gaps(boxes)
 
     # Phase 1 (sequential): crop + embed + cosine-rank candidates per box.
@@ -78,7 +79,7 @@ def run_scan(
     # scripts/visualize_scan_e2e.py + data/scan_viz/review.xlsx, and usage
     # (token cost tracking) is aggregated there too; neither is persisted to
     # scan_history/inventory.
-    for (i, depth, _, _), (sku_id, score, _reasoning, _usage) in zip(pending, llm_results):
+    for (i, depth, _, _), (sku_id, score, _reasoning, _usage, _ranked) in zip(pending, llm_results):
         detections[i] = {"sku_id": sku_id, "confidence": score, "depth": depth}
 
     low_confidence = is_low_confidence(detections, threshold=CONFIDENCE_THRESHOLD)
@@ -99,6 +100,7 @@ def run_scan(
         "value": value,
         "flags": flags,
         "gaps": gaps,
+        "flagged_regions": flagged_regions,
     }
 
 

@@ -117,7 +117,7 @@ def test_classify_crop_returns_llm_answer_and_its_own_ranked_score():
     ]
     llm_client = FakeLLMClient(answer="coke_330")
 
-    sku_id, score, _reasoning, _usage = classify_crop(
+    sku_id, score, _reasoning, _usage, _ranked = classify_crop(
         CROP_IMAGE, np.array([1.0, 0.0]), catalog_embeddings, catalog_items, llm_client
     )
 
@@ -130,7 +130,7 @@ def test_classify_crop_unknown_returns_none_with_top1_score():
     catalog_items = [{"sku_id": "choco_pie_orion", "name": "Chocopie"}]
     llm_client = FakeLLMClient(answer="unknown")
 
-    sku_id, score, _reasoning, _usage = classify_crop(
+    sku_id, score, _reasoning, _usage, _ranked = classify_crop(
         CROP_IMAGE, np.array([1.0, 0.0]), catalog_embeddings, catalog_items, llm_client
     )
 
@@ -143,7 +143,7 @@ def test_classify_crop_returns_llm_reasoning_alongside_answer():
     catalog_items = [{"sku_id": "choco_pie_orion", "name": "Chocopie"}]
     llm_client = FakeLLMClient(answer="choco_pie_orion", reasoning="Logo và font khớp hoàn toàn")
 
-    _sku_id, _score, reasoning, _usage = classify_crop(
+    _sku_id, _score, reasoning, _usage, _ranked = classify_crop(
         CROP_IMAGE, np.array([1.0, 0.0]), catalog_embeddings, catalog_items, llm_client
     )
 
@@ -155,24 +155,26 @@ def test_classify_crop_none_embedding_returns_none_and_zero_without_calling_llm(
     catalog_items = [{"sku_id": "choco_pie_orion", "name": "Chocopie"}]
     llm_client = FakeLLMClient(answer="choco_pie_orion")
 
-    sku_id, score, reasoning, usage = classify_crop(CROP_IMAGE, None, catalog_embeddings, catalog_items, llm_client)
+    sku_id, score, reasoning, usage, ranked = classify_crop(CROP_IMAGE, None, catalog_embeddings, catalog_items, llm_client)
 
     assert sku_id is None
     assert score == 0.0
     assert reasoning == ""
     assert usage == {"input_tokens": 0, "output_tokens": 0}
+    assert ranked == []
     assert llm_client.messages.calls == []
 
 
 def test_classify_crop_empty_catalog_returns_none_and_zero_without_calling_llm():
     llm_client = FakeLLMClient(answer="unknown")
 
-    sku_id, score, reasoning, usage = classify_crop(CROP_IMAGE, np.array([1.0, 0.0]), [], [], llm_client)
+    sku_id, score, reasoning, usage, ranked = classify_crop(CROP_IMAGE, np.array([1.0, 0.0]), [], [], llm_client)
 
     assert sku_id is None
     assert score == 0.0
     assert reasoning == ""
     assert usage == {"input_tokens": 0, "output_tokens": 0}
+    assert ranked == []
     assert llm_client.messages.calls == []
 
 
@@ -232,12 +234,13 @@ def test_rank_candidates_empty_when_embedding_missing_or_catalog_empty():
 def test_verify_with_llm_returns_none_and_zero_without_calling_llm_when_ranked_empty():
     llm_client = FakeLLMClient(answer="choco_pie_orion")
 
-    sku_id, score, reasoning, usage = verify_with_llm(CROP_IMAGE, [], [], llm_client)
+    sku_id, score, reasoning, usage, ranked = verify_with_llm(CROP_IMAGE, [], [], llm_client)
 
     assert sku_id is None
     assert score == 0.0
     assert reasoning == ""
     assert usage == {"input_tokens": 0, "output_tokens": 0}
+    assert ranked == []
     assert llm_client.messages.calls == []
 
 
@@ -246,7 +249,7 @@ def test_verify_with_llm_returns_llm_reasoning_alongside_answer():
     ranked = [("choco_pie_orion", 0.9)]
     catalog_items = [{"sku_id": "choco_pie_orion", "name": "Chocopie"}]
 
-    _sku_id, _score, reasoning, _usage = verify_with_llm(CROP_IMAGE, ranked, catalog_items, llm_client)
+    _sku_id, _score, reasoning, _usage, _ranked = verify_with_llm(CROP_IMAGE, ranked, catalog_items, llm_client)
 
     assert reasoning == "Trùng khớp logo"
 
@@ -256,7 +259,7 @@ def test_verify_with_llm_returns_llm_token_usage():
     ranked = [("choco_pie_orion", 0.9)]
     catalog_items = [{"sku_id": "choco_pie_orion", "name": "Chocopie"}]
 
-    _sku_id, _score, _reasoning, usage = verify_with_llm(CROP_IMAGE, ranked, catalog_items, llm_client)
+    _sku_id, _score, _reasoning, usage, _ranked = verify_with_llm(CROP_IMAGE, ranked, catalog_items, llm_client)
 
     assert usage == {"input_tokens": 100, "output_tokens": 20}
 
@@ -273,7 +276,7 @@ def test_classify_crops_parallel_runs_concurrently_not_sequentially():
     elapsed = time.monotonic() - start
 
     assert len(results) == n
-    assert all(sku_id == "choco_pie_orion" and score == 0.9 for sku_id, score, _reasoning, _usage in results)
+    assert all(sku_id == "choco_pie_orion" and score == 0.9 for sku_id, score, _reasoning, _usage, _ranked in results)
     # sequential would take n * delay (1.0s); parallel should be close to a
     # single delay, well under half the sequential time.
     assert elapsed < delay * n / 2
@@ -288,7 +291,7 @@ def test_classify_crops_parallel_preserves_order_despite_out_of_order_completion
 
     results = classify_crops_parallel(items, catalog_items, llm_client, max_workers=3)
 
-    assert [sku_id for sku_id, _score, _reasoning, _usage in results] == ["sku_0", "sku_1", "sku_2"]
+    assert [sku_id for sku_id, _score, _reasoning, _usage, _ranked in results] == ["sku_0", "sku_1", "sku_2"]
 
 
 def _fingerprint_color(i):
@@ -359,7 +362,7 @@ def test_classify_crops_parallel_positional_alignment_survives_interspersed_skip
     results = classify_crops_parallel(items, catalog_items, llm_client, max_workers=8)
 
     assert len(results) == n
-    for i, (sku_id, score, _reasoning, _usage) in enumerate(results):
+    for i, (sku_id, score, _reasoning, _usage, _ranked) in enumerate(results):
         if i in skip_indices:
             assert sku_id is None and score == 0.0, f"index {i} (skipped) got {sku_id!r}"
         else:
@@ -380,9 +383,11 @@ def test_classify_crops_parallel_isolates_failures_per_item(capsys):
     assert "simulated network failure" in results[1][2]
     # a failed call's usage isn't recoverable -> excluded from the cost estimate as zero
     assert results[1][3] == {"input_tokens": 0, "output_tokens": 0}
+    # failed call still surfaces its own shortlist
+    assert results[1][4] == [("sku_1", 0.9)]
 
     captured = capsys.readouterr()
-    assert "sku_1" not in "".join(sku_id or "" for sku_id, _score, _reasoning, _usage in results)
+    assert "sku_1" not in "".join(sku_id or "" for sku_id, _score, _reasoning, _usage, _ranked in results)
     assert "simulated network failure" in captured.out
 
 
@@ -397,3 +402,41 @@ def test_load_catalog_embeddings_reads_npy_files(tmp_path):
     assert len(result) == 1
     assert result[0][0] == "choco_pie_orion"
     assert np.allclose(result[0][1], embedding)
+
+
+def test_classify_crop_returns_full_ranked_candidate_list():
+    catalog_embeddings = [(f"sku_{i}", np.array([1.0 - i * 0.1, i * 0.1])) for i in range(5)]
+    catalog_items = [{"sku_id": f"sku_{i}", "name": f"Product {i}"} for i in range(5)]
+    llm_client = FakeLLMClient(answer="sku_0")
+
+    _sku_id, _score, _reasoning, _usage, ranked = classify_crop(
+        CROP_IMAGE, np.array([1.0, 0.0]), catalog_embeddings, catalog_items, llm_client, top_k=3
+    )
+
+    assert [sku_id for sku_id, _score in ranked] == ["sku_0", "sku_1", "sku_2"]
+
+
+def test_verify_with_llm_returns_the_ranked_list_it_was_given():
+    ranked = [("choco_pie_orion", 0.9), ("coke_330", 0.5)]
+    catalog_items = [
+        {"sku_id": "choco_pie_orion", "name": "Chocopie"},
+        {"sku_id": "coke_330", "name": "Coke"},
+    ]
+    llm_client = FakeLLMClient(answer="coke_330")
+
+    *_rest, returned_ranked = verify_with_llm(CROP_IMAGE, ranked, catalog_items, llm_client)
+
+    assert returned_ranked == ranked
+
+
+def test_classify_crops_parallel_returns_each_items_ranked_list():
+    catalog_items = [{"sku_id": "choco_pie_orion", "name": "Chocopie"}]
+    llm_client = FakeLLMClient(answer="choco_pie_orion")
+    ranked_a = [("choco_pie_orion", 0.9)]
+    ranked_b = [("choco_pie_orion", 0.7)]
+    items = [(CROP_IMAGE, ranked_a), (CROP_IMAGE, ranked_b)]
+
+    results = classify_crops_parallel(items, catalog_items, llm_client, max_workers=2)
+
+    assert results[0][4] == ranked_a
+    assert results[1][4] == ranked_b
