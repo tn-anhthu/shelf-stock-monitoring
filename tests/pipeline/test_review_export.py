@@ -1,7 +1,7 @@
 import openpyxl
 import pytest
 
-from src.pipeline.review_export import append_review_sheet
+from src.pipeline.review_export import append_review_sheet, format_candidates, parse_candidates
 
 
 def make_rows():
@@ -11,6 +11,7 @@ def make_rows():
             "crop_file": "crop_00_ok.jpg",
             "predicted_sku_id": "choco_pie_orion",
             "score": 0.91,
+            "top5_candidates": "choco_pie_orion:0.91, coke_330:0.55",
             "llm_reasoning": "Logo và bao bì khớp hoàn toàn",
             "correct": "",
             "true_sku_id": "",
@@ -21,6 +22,7 @@ def make_rows():
             "crop_file": "crop_01_ok.jpg",
             "predicted_sku_id": None,
             "score": 0.42,
+            "top5_candidates": "coke_330:0.42, choco_pie_orion:0.38",
             "llm_reasoning": "Không thấy candidate nào khớp thương hiệu",
             "correct": "",
             "true_sku_id": "",
@@ -39,13 +41,15 @@ def test_append_review_sheet_creates_new_file_when_missing(tmp_path):
     assert wb.sheetnames == ["test1_llm"]
     ws = wb["test1_llm"]
     assert [c.value for c in ws[1]] == [
-        "index", "crop_file", "predicted_sku_id", "score", "llm_reasoning", "correct", "true_sku_id", "depth",
+        "index", "crop_file", "predicted_sku_id", "score", "top5_candidates", "llm_reasoning", "correct", "true_sku_id", "depth",
     ]
     assert [c.value for c in ws[2]] == [
-        0, "crop_00_ok.jpg", "choco_pie_orion", 0.91, "Logo và bao bì khớp hoàn toàn", None, None, 1,
+        0, "crop_00_ok.jpg", "choco_pie_orion", 0.91, "choco_pie_orion:0.91, coke_330:0.55",
+        "Logo và bao bì khớp hoàn toàn", None, None, 1,
     ]
     assert [c.value for c in ws[3]] == [
-        1, "crop_01_ok.jpg", None, 0.42, "Không thấy candidate nào khớp thương hiệu", None, None, 1,
+        1, "crop_01_ok.jpg", None, 0.42, "coke_330:0.42, choco_pie_orion:0.38",
+        "Không thấy candidate nào khớp thương hiệu", None, None, 1,
     ]
 
 
@@ -82,6 +86,23 @@ def test_append_review_sheet_avoids_overwriting_same_sheet_name(tmp_path):
     wb = openpyxl.load_workbook(xlsx_path)
     assert wb["test1_llm"]["F2"].value == "yes"
     assert used_name in wb.sheetnames
+
+
+def test_format_candidates_formats_sku_score_pairs():
+    ranked = [("choco_pie_orion", 0.923), ("coke_330", 0.681)]
+    assert format_candidates(ranked) == "choco_pie_orion:0.92, coke_330:0.68"
+
+
+def test_format_candidates_empty_list_returns_empty_string():
+    assert format_candidates([]) == ""
+
+
+def test_parse_candidates_recovers_sku_id_list():
+    assert parse_candidates("choco_pie_orion:0.92, coke_330:0.68") == ["choco_pie_orion", "coke_330"]
+
+
+def test_parse_candidates_empty_string_returns_empty_list():
+    assert parse_candidates("") == []
 
 
 def test_append_review_sheet_raises_clear_error_when_file_locked(tmp_path, monkeypatch):
@@ -123,5 +144,5 @@ def test_append_review_sheet_does_not_disturb_a_pre_existing_old_format_sheet(tm
 
     new_ws = wb["new_format_sheet"]
     assert [c.value for c in new_ws[1]] == [
-        "index", "crop_file", "predicted_sku_id", "score", "llm_reasoning", "correct", "true_sku_id", "depth",
+        "index", "crop_file", "predicted_sku_id", "score", "top5_candidates", "llm_reasoning", "correct", "true_sku_id", "depth",
     ]
