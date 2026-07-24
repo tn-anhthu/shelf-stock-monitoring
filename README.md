@@ -41,7 +41,7 @@ Các giải pháp thị trường hiện có (Trax, Simbe Robotics/Tally, Focal 
 Giới hạn nhóm hàng FMCG có bao bì (nước giải khát, mì gói, bánh kẹo...), catalog ~100 SKU thật của 1 kệ cụ thể tại 1 siêu thị tiện lợi, làm demo target. Chạy local qua Streamlit/Gradio, lưu trữ bằng SQLite — không deploy public, không dùng cloud DB.
 
 Chi tiết đầy đủ (persona, user stories, feature spec, acceptance criteria, backend/frontendrequirements) xem
-[`docs/specs/2026-07-20-shelfsense-mvp-design.md`](docs/specs/2026-07-20-shelfsense-mvp-design.md).
+[`docs/specs/mvp-design.md`](docs/specs/mvp-design.md).
 
 ## 4. Pipeline
 
