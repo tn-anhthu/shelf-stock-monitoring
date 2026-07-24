@@ -55,7 +55,7 @@ from src.pipeline.classify import classify_crops_parallel, load_catalog_embeddin
 from src.pipeline.confidence import is_low_confidence
 from src.pipeline.crop import crop_box
 from src.pipeline.gap_detection import detect_gaps
-from src.pipeline.review_export import append_review_sheet
+from src.pipeline.review_export import append_review_sheet, format_candidates
 
 DEFAULT_DB_PATH = "data/shelfsense.db"
 DEFAULT_TOP_K = 5
@@ -184,9 +184,10 @@ def main():
     per_box_results = []
     crop_thumbs, crop_labels = [], []
     total_input_tokens, total_output_tokens = 0, 0
-    for (i, box, cropped, crop_status, _ranked), (sku_id, score, reasoning, usage) in zip(pending, llm_results):
+    for (i, box, cropped, crop_status, _ranked), (sku_id, score, reasoning, usage, candidates) in zip(pending, llm_results):
         per_box_results.append({
             "box": box, "sku_id": sku_id, "score": score, "crop_status": crop_status, "reasoning": reasoning,
+            "candidates": candidates,
         })
         total_input_tokens += usage["input_tokens"]
         total_output_tokens += usage["output_tokens"]
@@ -229,6 +230,7 @@ def main():
             "crop_file": f"crop_{i:02d}_ok.jpg" if r["crop_status"] == "ok" else "",
             "predicted_sku_id": r["sku_id"],
             "score": r["score"],
+            "top5_candidates": format_candidates(r["candidates"]),
             "llm_reasoning": r["reasoning"],
             "correct": "",
             "true_sku_id": "",
