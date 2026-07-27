@@ -32,6 +32,7 @@ file via python-dotenv, same as ANTHROPIC_API_KEY in visualize_scan_e2e.py).
 import argparse
 import os
 import sys
+import time
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -115,6 +116,14 @@ def main():
         "--indices", type=str, default=None,
         help="Comma-separated row `index` values to limit the run to (saves Gemini credit); default: every row in the sheet",
     )
+    parser.add_argument(
+        "--delay-seconds", type=float, default=13.0,
+        help=(
+            "Seconds to sleep between Gemini calls -- the free tier caps gemini-3.6-flash at "
+            "5 requests/minute (verified live: a real run hit RESOURCE_EXHAUSTED after 6 calls), "
+            "so the default paces to roughly 60/5=12s + margin. Set lower (e.g. 0) on a paid tier."
+        ),
+    )
     args = parser.parse_args()
 
     if not os.environ.get("GEMINI_API_KEY"):
@@ -132,6 +141,7 @@ def main():
     total_input_tokens, total_output_tokens = 0, 0
     claude_right, gemini_right, compared = 0, 0, 0
 
+    calls_made = 0
     for row in rows:
         crop_path = crops_dir / row["crop_file"]
         if not crop_path.exists():
@@ -140,7 +150,10 @@ def main():
         image = Image.open(crop_path)
         candidates = [(sku_id, names_by_sku.get(sku_id, sku_id)) for sku_id in row["candidate_sku_ids"]]
 
+        if calls_made > 0 and args.delay_seconds > 0:
+            time.sleep(args.delay_seconds)
         gemini_answer, gemini_reasoning, usage = escalate_to_llm_gemini(gemini_client, image, candidates)
+        calls_made += 1
         total_input_tokens += usage["input_tokens"]
         total_output_tokens += usage["output_tokens"]
         cost = (
