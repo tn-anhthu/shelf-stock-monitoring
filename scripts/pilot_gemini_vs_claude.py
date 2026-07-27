@@ -74,10 +74,21 @@ def _parse_indices(raw: str) -> List[int]:
 
 
 def _gemini_verdict(predicted_sku_id: Optional[str], true_sku_id: str) -> str:
-    if not true_sku_id or true_sku_id.lower() in UNKNOWN_SENTINELS:
-        return "?"
+    """Scores Gemini's answer against true_sku_id, case-insensitively.
+
+    A catalog-gap ground truth (true_sku_id empty or "unknown") is scored
+    RIGHT iff Gemini also answered unknown -- verified live that this matters:
+    an earlier version returned "?" (uncounted) here even when Gemini
+    correctly said unknown, silently excluding ~35/59 rows from a real run's
+    accuracy count and making Gemini look far worse than it actually was.
+    true_sku_id may be a comma-separated list (a crop showing more than one
+    product where either is an accepted answer) -- correct if Gemini's
+    answer matches any of them."""
     predicted = (predicted_sku_id or "").strip().lower()
-    return "RIGHT" if predicted == true_sku_id.strip().lower() else "WRONG"
+    if not true_sku_id or true_sku_id.lower() in UNKNOWN_SENTINELS:
+        return "RIGHT" if predicted in UNKNOWN_SENTINELS else "WRONG"
+    true_options = [t.strip().lower() for t in true_sku_id.split(",")]
+    return "RIGHT" if predicted in true_options else "WRONG"
 
 
 def load_sheet_rows(xlsx_path: str, sheet_name: str, indices: Optional[List[int]] = None) -> List[Dict]:
