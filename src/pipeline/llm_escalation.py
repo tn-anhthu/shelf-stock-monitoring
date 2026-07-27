@@ -241,9 +241,14 @@ def escalate_to_llm_gemini(
                 # (finish_reason=MAX_TOKENS) and exhausting all retries. This
                 # task doesn't need extended reasoning (the schema's own
                 # `reasoning` field already captures the explanation), so
-                # thinking is disabled outright rather than raising the
-                # budget further.
-                thinking_config=types.ThinkingConfig(thinking_budget=0),
+                # thinking is turned down as far as this model allows.
+                # thinking_budget=0 was tried first and rejected outright
+                # (400 INVALID_ARGUMENT) -- this model wants thinking_level,
+                # not thinking_budget, to disable/minimize it. Verified live:
+                # MINIMAL gives finish_reason=STOP and thoughts_token_count=
+                # None (no thinking tokens spent) on the same crop that
+                # truncated before.
+                thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.MINIMAL),
             ),
         )
         usage["input_tokens"] += response.usage_metadata.prompt_token_count

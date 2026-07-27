@@ -296,11 +296,15 @@ def test_escalate_to_llm_gemini_schema_enum_is_sku_ids_plus_unknown(tmp_path):
     assert config.response_json_schema["properties"]["answer"]["enum"] == ["choco_pie_orion", "coke_330", "unknown"]
 
 
-def test_escalate_to_llm_gemini_disables_thinking_to_avoid_output_truncation(tmp_path):
+def test_escalate_to_llm_gemini_minimizes_thinking_to_avoid_output_truncation(tmp_path):
     # Regression test: a real call against gemini-3.6-flash spent
     # thoughts_token_count=460 of the 512 max_output_tokens budget on internal
     # "thinking" before writing any visible JSON, truncating the response
     # mid-string (finish_reason=MAX_TOKENS) and exhausting all retries.
+    # thinking_budget=0 was tried first and rejected outright (400
+    # INVALID_ARGUMENT) -- this model wants thinking_level=MINIMAL instead.
+    from google.genai import types
+
     client = FakeGeminiClient(answer="choco_pie_orion")
     image = Image.new("RGB", (10, 10))
     candidates = [("choco_pie_orion", "Chocopie")]
@@ -308,7 +312,7 @@ def test_escalate_to_llm_gemini_disables_thinking_to_avoid_output_truncation(tmp
     escalate_to_llm_gemini(client, image, candidates, images_dir=str(tmp_path))
 
     config = client.models.calls[0]["config"]
-    assert config.thinking_config.thinking_budget == 0
+    assert config.thinking_config.thinking_level == types.ThinkingLevel.MINIMAL
 
 
 def test_escalate_to_llm_gemini_uses_the_same_prompt_text_as_claude(tmp_path):
