@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 from PIL import Image
 
-from src.pipeline.llm_escalation import escalate_to_llm
+from src.pipeline.llm_escalation import escalate_to_llm, escalate_to_llm_gemini
 
 
 FAKE_USAGE = SimpleNamespace(input_tokens=100, output_tokens=20)
@@ -49,6 +49,57 @@ class FlakyMessages:
 class FlakyLLMClient:
     def __init__(self, fail_times, answer):
         self.messages = FlakyMessages(fail_times, answer)
+
+
+class FakeGeminiUsage:
+    def __init__(self, prompt_token_count=100, candidates_token_count=20):
+        self.prompt_token_count = prompt_token_count
+        self.candidates_token_count = candidates_token_count
+
+
+class FakeGeminiResponse:
+    def __init__(self, text, prompt_token_count=100, candidates_token_count=20):
+        self.text = text
+        self.usage_metadata = FakeGeminiUsage(prompt_token_count, candidates_token_count)
+
+
+class FakeGeminiModels:
+    def __init__(self, answer, reasoning="Bao bì khớp với candidate này"):
+        self.answer = answer
+        self.reasoning = reasoning
+        self.calls = []
+
+    def generate_content(self, **kwargs):
+        self.calls.append(kwargs)
+        text = json.dumps({"reasoning": self.reasoning, "answer": self.answer})
+        return FakeGeminiResponse(text)
+
+
+class FakeGeminiClient:
+    def __init__(self, answer, reasoning="Bao bì khớp với candidate này"):
+        self.models = FakeGeminiModels(answer, reasoning)
+
+
+class FlakyGeminiModels:
+    """Mirrors FlakyMessages but for the google-genai response shape."""
+
+    def __init__(self, fail_times, answer):
+        self.fail_times = fail_times
+        self.answer = answer
+        self.calls = 0
+
+    def generate_content(self, **kwargs):
+        self.calls += 1
+        if self.calls <= self.fail_times:
+            text = "{answer: " + self.answer  # malformed: unquoted key, unterminated
+        else:
+            text = json.dumps({"reasoning": "ok", "answer": self.answer})
+        return FakeGeminiResponse(text)
+
+
+class FlakyGeminiClient:
+    def __init__(self, fail_times, answer):
+        self.models = FlakyGeminiModels(fail_times, answer)
 
 
 def _make_reference_image(images_dir, sku_id):
@@ -209,3 +260,100 @@ def test_escalate_to_llm_raises_after_exhausting_retries_on_persistent_malformed
         escalate_to_llm(client, image, candidates, images_dir=str(tmp_path))
 
     assert client.messages.calls == 3  # 1 initial attempt + 2 retries (default max_retries=2)
+
+
+def test_escalate_to_llm_gemini_returns_answer_and_reasoning_from_response(tmp_path):
+    client = FakeGeminiClient(answer="choco_pie_orion", reasoning="Logo và màu bao bì khớp hoàn toàn")
+    image = Image.new("RGB", (10, 10))
+    candidates = [("choco_pie_orion", "Chocopie"), ("coke_330", "Coke")]
+
+    answer, reasoning, usage = escalate_to_llm_gemini(client, image, candidates, images_dir=str(tmp_path))
+
+    assert answer == "choco_pie_orion"
+    assert reasoning == "Logo và màu bao bì khớp hoàn toàn"
+    assert usage == {"input_tokens": 100, "output_tokens": 20}
+
+
+def test_escalate_to_llm_gemini_returns_unknown_when_model_says_so(tmp_path):
+    client = FakeGeminiClient(answer="unknown", reasoning="Không có candidate nào khớp thương hiệu")
+    image = Image.new("RGB", (10, 10))
+    candidates = [("choco_pie_orion", "Chocopie")]
+
+    answer, reasoning, _usage = escalate_to_llm_gemini(client, image, candidates, images_dir=str(tmp_path))
+
+    assert answer == "unknown"
+    assert reasoning == "Không có candidate nào khớp thương hiệu"
+
+
+def test_escalate_to_llm_gemini_schema_enum_is_sku_ids_plus_unknown(tmp_path):
+    client = FakeGeminiClient(answer="choco_pie_orion")
+    image = Image.new("RGB", (10, 10))
+    candidates = [("choco_pie_orion", "Chocopie"), ("coke_330", "Coke")]
+
+    escalate_to_llm_gemini(client, image, candidates, images_dir=str(tmp_path))
+
+    config = client.models.calls[0]["config"]
+    assert config.response_json_schema["properties"]["answer"]["enum"] == ["choco_pie_orion", "coke_330", "unknown"]
+
+
+def test_escalate_to_llm_gemini_uses_the_same_prompt_text_as_claude(tmp_path):
+    client = FakeGeminiClient(answer="choco_pie_orion")
+    image = Image.new("RGB", (10, 10))
+    candidates = [("choco_pie_orion", "Chocopie")]
+
+    escalate_to_llm_gemini(client, image, candidates, images_dir=str(tmp_path))
+
+    parts = client.models.calls[0]["contents"][0].parts
+    final_text = parts[-1].text
+    assert 'you MUST answer "unknown"' in final_text
+    assert "much worse than answering unknown" in final_text
+
+
+def test_escalate_to_llm_gemini_includes_reference_image_when_it_exists(tmp_path):
+    _make_reference_image(tmp_path, "choco_pie_orion")
+    client = FakeGeminiClient(answer="choco_pie_orion")
+    image = Image.new("RGB", (10, 10))
+    candidates = [("choco_pie_orion", "Chocopie")]
+
+    escalate_to_llm_gemini(client, image, candidates, images_dir=str(tmp_path))
+
+    parts = client.models.calls[0]["contents"][0].parts
+    # crop image + intro text + candidate label + reference image + final instruction
+    assert len(parts) == 5
+
+
+def test_escalate_to_llm_gemini_falls_back_to_text_only_when_reference_image_missing(tmp_path):
+    client = FakeGeminiClient(answer="unknown")
+    image = Image.new("RGB", (10, 10))
+    candidates = [("choco_pie_orion", "Chocopie"), ("coke_330", "Coke")]
+
+    answer, _reasoning, _usage = escalate_to_llm_gemini(client, image, candidates, images_dir=str(tmp_path))
+
+    parts = client.models.calls[0]["contents"][0].parts
+    # crop image + intro text + 2 candidate labels + final instruction, no reference images
+    assert len(parts) == 5
+    assert answer == "unknown"
+
+
+def test_escalate_to_llm_gemini_retries_once_on_malformed_json_then_succeeds(tmp_path):
+    client = FlakyGeminiClient(fail_times=1, answer="choco_pie_orion")
+    image = Image.new("RGB", (10, 10))
+    candidates = [("choco_pie_orion", "Chocopie")]
+
+    answer, reasoning, usage = escalate_to_llm_gemini(client, image, candidates, images_dir=str(tmp_path))
+
+    assert answer == "choco_pie_orion"
+    assert reasoning == "ok"
+    assert client.models.calls == 2
+    assert usage == {"input_tokens": 200, "output_tokens": 40}
+
+
+def test_escalate_to_llm_gemini_raises_after_exhausting_retries_on_persistent_malformed_json(tmp_path):
+    client = FlakyGeminiClient(fail_times=99, answer="choco_pie_orion")
+    image = Image.new("RGB", (10, 10))
+    candidates = [("choco_pie_orion", "Chocopie")]
+
+    with pytest.raises(json.JSONDecodeError):
+        escalate_to_llm_gemini(client, image, candidates, images_dir=str(tmp_path))
+
+    assert client.models.calls == 3

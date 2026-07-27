@@ -61,12 +61,41 @@ from typing import Dict, List, Optional, Tuple
 from PIL import Image
 
 MODEL_ID = "claude-haiku-4-5"
+GEMINI_MODEL_ID = os.environ.get("GEMINI_ESCALATION_MODEL", "gemini-2.5-flash")
+
+_INTRO_TEXT = "Đây là ảnh sản phẩm cần nhận diện:"
+_MATCH_INSTRUCTION_TEXT = (
+    "This is a crop of a single product from a retail shelf, along with reference "
+    "images of each candidate below. Compare the crop image against each reference "
+    "image carefully: only choose a sku_id if the brand, product name, and "
+    "packaging design match almost exactly — not just similar product category or "
+    "color tone. If the crop shows any clear difference (different brand name, "
+    "different text, different design) from ALL candidates, or you are not "
+    "confident enough, you MUST answer \"unknown\" — choosing the wrong SKU is much "
+    "worse than answering unknown.\n\n"
+    "Write your reasoning in English: briefly compare the crop against the "
+    "reference images, focusing on the candidates that are genuinely plausible "
+    "(same product category/color) rather than restating every candidate. State "
+    "clearly what specific feature (brand, text, design) confirms or rules out "
+    "your final answer. You may quote short Vietnamese text visible on the "
+    "packaging if relevant (e.g. brand names, flavor labels), but the reasoning "
+    "itself should be written in English."
+)
+_REASONING_SCHEMA_DESCRIPTION = (
+    "Reasoning in English: brief comparison against the "
+    "genuinely plausible candidates, stating the specific "
+    "feature that confirms or rules out the final answer"
+)
+
+
+def _image_bytes(image: Image.Image) -> bytes:
+    buf = io.BytesIO()
+    image.convert("RGB").save(buf, format="JPEG")
+    return buf.getvalue()
 
 
 def _encode_image(image: Image.Image) -> str:
-    buf = io.BytesIO()
-    image.convert("RGB").save(buf, format="JPEG")
-    return base64.standard_b64encode(buf.getvalue()).decode("utf-8")
+    return base64.standard_b64encode(_image_bytes(image)).decode("utf-8")
 
 
 def _image_block(image: Image.Image) -> Dict:
@@ -103,33 +132,14 @@ def escalate_to_llm(
 
     content: List[Dict] = [
         _image_block(image),
-        {"type": "text", "text": "Đây là ảnh sản phẩm cần nhận diện:"},
+        {"type": "text", "text": _INTRO_TEXT},
     ]
     for sku_id, name in candidates:
         content.append({"type": "text", "text": f"- {sku_id}: {name}"})
         reference_image = _load_reference_image(sku_id, images_dir)
         if reference_image is not None:
             content.append(_image_block(reference_image))
-    content.append({
-        "type": "text",
-        "text": (
-            "This is a crop of a single product from a retail shelf, along with reference "
-            "images of each candidate below. Compare the crop image against each reference "
-            "image carefully: only choose a sku_id if the brand, product name, and "
-            "packaging design match almost exactly — not just similar product category or "
-            "color tone. If the crop shows any clear difference (different brand name, "
-            "different text, different design) from ALL candidates, or you are not "
-            "confident enough, you MUST answer \"unknown\" — choosing the wrong SKU is much "
-            "worse than answering unknown.\n\n"
-            "Write your reasoning in English: briefly compare the crop against the "
-            "reference images, focusing on the candidates that are genuinely plausible "
-            "(same product category/color) rather than restating every candidate. State "
-            "clearly what specific feature (brand, text, design) confirms or rules out "
-            "your final answer. You may quote short Vietnamese text visible on the "
-            "packaging if relevant (e.g. brand names, flavor labels), but the reasoning "
-            "itself should be written in English."
-        ),
-    })
+    content.append({"type": "text", "text": _MATCH_INSTRUCTION_TEXT})
 
     usage = {"input_tokens": 0, "output_tokens": 0}
     for attempt in range(max_retries + 1):
@@ -145,11 +155,7 @@ def escalate_to_llm(
                         "properties": {
                             "reasoning": {
                                 "type": "string",
-                                "description": (
-                                    "Reasoning in English: brief comparison against the "
-                                    "genuinely plausible candidates, stating the specific "
-                                    "feature that confirms or rules out the final answer"
-                                ),
+                                "description": _REASONING_SCHEMA_DESCRIPTION,
                             },
                             "answer": {"type": "string", "enum": sku_ids + ["unknown"]},
                         },
@@ -164,6 +170,72 @@ def escalate_to_llm(
         text = next(b.text for b in response.content if b.type == "text")
         try:
             parsed = json.loads(text)
+            return parsed["answer"], parsed.get("reasoning", ""), usage
+        except json.JSONDecodeError:
+            if attempt == max_retries:
+                raise
+
+
+def escalate_to_llm_gemini(
+    client,
+    image: Image.Image,
+    candidates: List[Tuple[str, str]],
+    images_dir: str = "data/catalog/images",
+    max_retries: int = 2,
+) -> Tuple[str, str, Dict[str, int]]:
+    """Gemini 2.5 Flash counterpart to escalate_to_llm -- same interface
+    (answer, reasoning, usage) and the exact same prompt/schema, via the
+    shared _INTRO_TEXT/_MATCH_INSTRUCTION_TEXT/_REASONING_SCHEMA_DESCRIPTION
+    constants above, so scripts/pilot_gemini_vs_claude.py can compare a fresh
+    Gemini answer against Claude's already-recorded answer on an identical
+    crop + candidate list. See escalate_to_llm's docstring for why the
+    prompt/schema look the way they do -- this function inherits that
+    reasoning unchanged, just on a different provider's SDK/types.
+
+    client is a google.genai.Client (or anything exposing the same
+    client.models.generate_content(...) shape) -- constructing it is the
+    caller's job, same division of responsibility as escalate_to_llm's
+    anthropic.Anthropic client."""
+    from google.genai import types  # deferred: google-genai is an optional dependency, only needed by this provider
+
+    sku_ids = [sku_id for sku_id, _ in candidates]
+
+    parts: List["types.Part"] = [
+        types.Part.from_bytes(data=_image_bytes(image), mime_type="image/jpeg"),
+        types.Part.from_text(text=_INTRO_TEXT),
+    ]
+    for sku_id, name in candidates:
+        parts.append(types.Part.from_text(text=f"- {sku_id}: {name}"))
+        reference_image = _load_reference_image(sku_id, images_dir)
+        if reference_image is not None:
+            parts.append(types.Part.from_bytes(data=_image_bytes(reference_image), mime_type="image/jpeg"))
+    parts.append(types.Part.from_text(text=_MATCH_INSTRUCTION_TEXT))
+
+    schema = {
+        "type": "object",
+        "properties": {
+            "reasoning": {"type": "string", "description": _REASONING_SCHEMA_DESCRIPTION},
+            "answer": {"type": "string", "enum": sku_ids + ["unknown"]},
+        },
+        "required": ["reasoning", "answer"],
+        "additionalProperties": False,
+    }
+
+    usage = {"input_tokens": 0, "output_tokens": 0}
+    for attempt in range(max_retries + 1):
+        response = client.models.generate_content(
+            model=GEMINI_MODEL_ID,
+            contents=[types.Content(role="user", parts=parts)],
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_json_schema=schema,
+                max_output_tokens=512,
+            ),
+        )
+        usage["input_tokens"] += response.usage_metadata.prompt_token_count
+        usage["output_tokens"] += response.usage_metadata.candidates_token_count
+        try:
+            parsed = json.loads(response.text)
             return parsed["answer"], parsed.get("reasoning", ""), usage
         except json.JSONDecodeError:
             if attempt == max_retries:
