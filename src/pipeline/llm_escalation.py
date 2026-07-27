@@ -61,7 +61,11 @@ from typing import Dict, List, Optional, Tuple
 from PIL import Image
 
 MODEL_ID = "claude-haiku-4-5"
-GEMINI_MODEL_ID = os.environ.get("GEMINI_ESCALATION_MODEL", "gemini-2.5-flash")
+# gemini-2.5-flash (and 2.5-flash-lite) are no longer available to new API
+# keys as of 2026-07 -- verified live against this project's own key.
+# gemini-3.6-flash confirmed working (a full flash-tier model, not
+# lite/preview) -- see .env.example for pricing/verification date.
+GEMINI_MODEL_ID = os.environ.get("GEMINI_ESCALATION_MODEL", "gemini-3.6-flash")
 
 _INTRO_TEXT = "Đây là ảnh sản phẩm cần nhận diện:"
 _MATCH_INSTRUCTION_TEXT = (

@@ -1,4 +1,5 @@
-"""Pilot: compare Gemini 2.5 Flash against Claude on the SAME crops/candidates,
+"""Pilot: compare Gemini (gemini-3.6-flash -- see src/pipeline/llm_escalation.py's
+GEMINI_MODEL_ID for why not 2.5 Flash) against Claude on the SAME crops/candidates,
 without spending any more Claude API credit.
 
 Motivation: the project's Claude credit is exhausted, but every crop from a
@@ -55,11 +56,12 @@ DEFAULT_DB_PATH = "data/shelfsense.db"
 UNKNOWN_SENTINELS = {"", "unknown"}
 VERDICT_LABEL = {"yes": "RIGHT", "no": "WRONG", "?": "?"}
 
-# Gemini 2.5 Flash pricing (https://ai.google.dev/gemini-api/docs/pricing), per
-# million tokens -- used to turn this run's summed usage into a rough dollar
-# estimate, same approach as visualize_scan_e2e.py's Haiku cost constants.
-GEMINI_INPUT_COST_PER_MTOK = 0.30
-GEMINI_OUTPUT_COST_PER_MTOK = 2.50
+# gemini-3.6-flash pricing (https://ai.google.dev/gemini-api/docs/pricing,
+# checked 2026-07-27), per million tokens -- used to turn this run's summed
+# usage into a rough dollar estimate, same approach as visualize_scan_e2e.py's
+# Haiku cost constants. Update these if GEMINI_ESCALATION_MODEL changes.
+GEMINI_INPUT_COST_PER_MTOK = 1.50
+GEMINI_OUTPUT_COST_PER_MTOK = 7.50
 
 
 def _parse_indices(raw: str) -> List[int]:
