@@ -1,6 +1,8 @@
-"""Pilot: compare Gemini (gemini-3.6-flash -- see src/pipeline/llm_escalation.py's
-GEMINI_MODEL_ID for why not 2.5 Flash) against Claude on the SAME crops/candidates,
-without spending any more Claude API credit.
+"""Pilot: compare Gemini (gemini-3.5-flash-lite by default -- see
+src/pipeline/llm_escalation.py's GEMINI_MODEL_ID for why not 2.5 Flash, and
+for the cheaper-but-still-working -lite alternative to 3.6-flash) against
+Claude on the SAME crops/candidates, without spending any more Claude API
+credit.
 
 Motivation: the project's Claude credit is exhausted, but every crop from a
 prior real e2e run is already sitting in data/scan_viz/review.xlsx --
@@ -57,12 +59,14 @@ DEFAULT_DB_PATH = "data/shelfsense.db"
 UNKNOWN_SENTINELS = {"", "unknown"}
 VERDICT_LABEL = {"yes": "RIGHT", "no": "WRONG", "?": "?"}
 
-# gemini-3.6-flash pricing (https://ai.google.dev/gemini-api/docs/pricing,
+# gemini-3.5-flash-lite pricing (https://ai.google.dev/gemini-api/docs/pricing,
 # checked 2026-07-27), per million tokens -- used to turn this run's summed
 # usage into a rough dollar estimate, same approach as visualize_scan_e2e.py's
-# Haiku cost constants. Update these if GEMINI_ESCALATION_MODEL changes.
-GEMINI_INPUT_COST_PER_MTOK = 1.50
-GEMINI_OUTPUT_COST_PER_MTOK = 7.50
+# Haiku cost constants. Update these if GEMINI_ESCALATION_MODEL changes --
+# e.g. gemini-3.6-flash is $1.50/$7.50, a full (non-lite) tier confirmed
+# working if quality matters more than cost.
+GEMINI_INPUT_COST_PER_MTOK = 0.30
+GEMINI_OUTPUT_COST_PER_MTOK = 2.50
 
 
 def _parse_indices(raw: str) -> List[int]:
@@ -121,7 +125,8 @@ def main():
         help=(
             "Seconds to sleep between Gemini calls -- the free tier caps gemini-3.6-flash at "
             "5 requests/minute (verified live: a real run hit RESOURCE_EXHAUSTED after 6 calls), "
-            "so the default paces to roughly 60/5=12s + margin. Set lower (e.g. 0) on a paid tier."
+            "so the default paces to roughly 60/5=12s + margin as a conservative default across "
+            "models. Set lower (e.g. 0) on a paid tier / once billing is enabled."
         ),
     )
     args = parser.parse_args()
