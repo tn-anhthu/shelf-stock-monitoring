@@ -10,6 +10,7 @@ ultralytics>=8.3
 pillow==12.3.0
 pillow-heif>=0.18
 openpyxl>=3.1
+google-genai>=2.0
 numpy==2.2.6
 requests>=2.31
 pytest>=8.0
