@@ -264,6 +264,56 @@ def test_verify_with_llm_returns_llm_token_usage():
     assert usage == {"input_tokens": 100, "output_tokens": 20}
 
 
+def test_verify_with_llm_dispatches_to_gemini_when_llm_provider_env_is_gemini(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "gemini")
+    calls = []
+
+    def fake_gemini(client, image, candidates, images_dir="data/catalog/images"):
+        calls.append((client, image, candidates, images_dir))
+        return "coke_330", "gemini reasoning", {"input_tokens": 10, "output_tokens": 5}
+
+    monkeypatch.setattr("src.pipeline.classify.escalate_to_llm_gemini", fake_gemini)
+
+    ranked = [("choco_pie_orion", 0.9), ("coke_330", 0.5)]
+    catalog_items = [
+        {"sku_id": "choco_pie_orion", "name": "Chocopie"},
+        {"sku_id": "coke_330", "name": "Coke"},
+    ]
+    fake_gemini_client = object()
+
+    sku_id, score, reasoning, usage, _ranked = verify_with_llm(CROP_IMAGE, ranked, catalog_items, fake_gemini_client)
+
+    assert sku_id == "coke_330"
+    assert reasoning == "gemini reasoning"
+    assert usage == {"input_tokens": 10, "output_tokens": 5}
+    assert len(calls) == 1
+    assert calls[0][0] is fake_gemini_client
+
+
+def test_verify_with_llm_defaults_to_claude_when_llm_provider_env_unset(monkeypatch):
+    monkeypatch.delenv("LLM_PROVIDER", raising=False)
+    llm_client = FakeLLMClient(answer="choco_pie_orion")
+    ranked = [("choco_pie_orion", 0.9)]
+    catalog_items = [{"sku_id": "choco_pie_orion", "name": "Chocopie"}]
+
+    sku_id, _score, _reasoning, _usage, _ranked = verify_with_llm(CROP_IMAGE, ranked, catalog_items, llm_client)
+
+    assert sku_id == "choco_pie_orion"
+    assert llm_client.messages.calls  # went through escalate_to_llm's Anthropic-shaped fake, not gemini
+
+
+def test_verify_with_llm_dispatches_to_claude_when_llm_provider_env_is_anthropic(monkeypatch):
+    monkeypatch.setenv("LLM_PROVIDER", "anthropic")
+    llm_client = FakeLLMClient(answer="choco_pie_orion")
+    ranked = [("choco_pie_orion", 0.9)]
+    catalog_items = [{"sku_id": "choco_pie_orion", "name": "Chocopie"}]
+
+    sku_id, _score, _reasoning, _usage, _ranked = verify_with_llm(CROP_IMAGE, ranked, catalog_items, llm_client)
+
+    assert sku_id == "choco_pie_orion"
+    assert llm_client.messages.calls
+
+
 def test_classify_crops_parallel_runs_concurrently_not_sequentially():
     delay = 0.2
     n = 5

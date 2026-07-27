@@ -21,6 +21,7 @@ threading is enough, no need for multiprocessing). classify_crop remains a
 thin wrapper doing both phases for one box, so existing single-box callers
 don't need to change.
 """
+import os
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, List, Optional, Tuple
 
@@ -28,7 +29,7 @@ import numpy as np
 from PIL import Image
 
 from src.classification.benchmark.retrieve import cosine_similarity
-from src.pipeline.llm_escalation import escalate_to_llm
+from src.pipeline.llm_escalation import escalate_to_llm, escalate_to_llm_gemini
 
 
 def load_catalog_embeddings(catalog_items: List[Dict]) -> List[Tuple[str, np.ndarray]]:
@@ -48,6 +49,18 @@ def rank_candidates(
 
 
 ZERO_USAGE = {"input_tokens": 0, "output_tokens": 0}
+
+
+def _escalate(llm_client, crop_image, candidates, images_dir):
+    """Dispatches to the LLM provider named by the LLM_PROVIDER env var
+    (anthropic | gemini, default anthropic -- see .env.example). The caller
+    is responsible for constructing an llm_client matching that same
+    provider (anthropic.Anthropic vs. google.genai.Client); this function
+    only decides which escalate_to_llm* function's shape to call it with."""
+    provider = os.environ.get("LLM_PROVIDER", "anthropic")
+    if provider == "gemini":
+        return escalate_to_llm_gemini(llm_client, crop_image, candidates, images_dir=images_dir)
+    return escalate_to_llm(llm_client, crop_image, candidates, images_dir=images_dir)
 
 
 def verify_with_llm(
@@ -73,7 +86,7 @@ def verify_with_llm(
     names_by_sku = {item["sku_id"]: item.get("name", item["sku_id"]) for item in catalog_items}
     candidates = [(sku_id, names_by_sku.get(sku_id, sku_id)) for sku_id, _ in ranked]
 
-    answer, reasoning, usage = escalate_to_llm(llm_client, crop_image, candidates, images_dir=images_dir)
+    answer, reasoning, usage = _escalate(llm_client, crop_image, candidates, images_dir)
 
     if answer == "unknown":
         return None, ranked[0][1], reasoning, usage, ranked
