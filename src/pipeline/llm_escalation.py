@@ -234,6 +234,16 @@ def escalate_to_llm_gemini(
                 response_mime_type="application/json",
                 response_json_schema=schema,
                 max_output_tokens=512,
+                # Gemini 3.6 Flash's internal "thinking" tokens count against
+                # max_output_tokens -- verified live: a real call spent
+                # thoughts_token_count=460 of the 512 budget before writing
+                # any visible JSON, truncating the response mid-string
+                # (finish_reason=MAX_TOKENS) and exhausting all retries. This
+                # task doesn't need extended reasoning (the schema's own
+                # `reasoning` field already captures the explanation), so
+                # thinking is disabled outright rather than raising the
+                # budget further.
+                thinking_config=types.ThinkingConfig(thinking_budget=0),
             ),
         )
         usage["input_tokens"] += response.usage_metadata.prompt_token_count
