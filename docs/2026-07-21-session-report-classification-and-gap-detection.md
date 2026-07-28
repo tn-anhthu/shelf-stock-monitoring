@@ -97,7 +97,7 @@ So sánh 2 hướng dùng LLM:
   việc này có làm nhạt phần "chứng minh kỹ năng CV tự xây" mà đồ án hướng tới hay không (điểm
   này chỉ Thư biết rõ theo rubric khóa học).
 
-Chưa chốt — đang chờ Thư quyết định hướng nào trước khi Claude Code implement `escalate_to_llm`.
+Chưa chốt — đang chờ Thư quyết định hướng nào trước khi implement `escalate_to_llm`.
 
 ## Việc còn treo (chưa làm)
 
