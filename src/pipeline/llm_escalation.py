@@ -93,6 +93,39 @@ _REASONING_SCHEMA_DESCRIPTION = (
     "feature that confirms or rules out the final answer"
 )
 
+# verify_same_object: 2026-07-28e, for the 42 known high-IoU/high-containment
+# box pairs from docs/reports/2026-07-28d-nms-iou-duplicate-detection.md.
+# Measured there: neither IoU nor containment alone can tell apart (a) one
+# physical product detected twice ("same_object", should merge) from (b) 2
+# real, separate physical units -- possibly the SAME sku_id, stacked/adjacent,
+# with imprecise box regression -- which must NOT be merged (confirmed by hand
+# on 3 test3 pairs: 2 stacked Yakult 5-packs and 1 Betagen bottle each got 2
+# overlapping-but-off-center boxes, neither box cleanly matching either real
+# unit). The prompt below explicitly names that failure mode so the model
+# doesn't default to "looks like 1 product" just because the crops look alike.
+_SAME_OBJECT_INSTRUCTION_TEXT = (
+    "These are 2 crops from the same retail shelf photo. Both were flagged because "
+    "their bounding boxes overlap heavily (high IoU, one box mostly contains the "
+    "other) -- but that geometric overlap alone can't tell whether this is really "
+    "1 physical product detected twice by mistake, or 2 separate physical product "
+    "units (possibly the exact same SKU, e.g. 2 packs of the same brand stacked or "
+    "standing side by side) that the detector drew overlapping/imprecise boxes "
+    "around. Look at the actual product content in each crop, not just how similar "
+    "the crops look: if you can see 2 distinguishable physical units (e.g. 2 "
+    "separate caps/lids, 2 separate product silhouettes, a visible seam or gap "
+    "between 2 packs) even when they're the same brand and flavor, answer "
+    "\"different_objects\" -- do NOT merge them just because they're the same SKU. "
+    "Only answer \"same_object\" if both crops are clearly showing 2 overlapping "
+    "views of the exact same single physical item (e.g. one crop cuts off the top "
+    "of the item, the other cuts off the bottom, but there is only 1 item there).\n\n"
+    "Write your reasoning in English: state specifically what you see that "
+    "confirms 1 item vs 2 (or that you cannot tell)."
+)
+_SAME_OBJECT_REASONING_SCHEMA_DESCRIPTION = (
+    "Reasoning in English: what specifically in the 2 crops shows 1 physical "
+    "item vs 2 separate physical items"
+)
+
 
 def _image_bytes(image: Image.Image) -> bytes:
     buf = io.BytesIO()
@@ -250,6 +283,106 @@ def escalate_to_llm_gemini(
                 # MINIMAL gives finish_reason=STOP and thoughts_token_count=
                 # None (no thinking tokens spent) on the same crop that
                 # truncated before.
+                thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.MINIMAL),
+            ),
+        )
+        usage["input_tokens"] += response.usage_metadata.prompt_token_count
+        usage["output_tokens"] += response.usage_metadata.candidates_token_count
+        try:
+            parsed = json.loads(response.text)
+            return parsed["answer"], parsed.get("reasoning", ""), usage
+        except json.JSONDecodeError:
+            if attempt == max_retries:
+                raise
+
+
+def verify_same_object(
+    client,
+    crop_a: Image.Image,
+    crop_b: Image.Image,
+    max_retries: int = 2,
+) -> Tuple[str, str, Dict[str, int]]:
+    """Returns (answer, reasoning, usage), answer in {"same_object", "different_objects"}.
+    See _SAME_OBJECT_INSTRUCTION_TEXT for why this is a distinct question from
+    escalate_to_llm's SKU match: geometric overlap (IoU/containment) can't tell
+    apart "1 product detected twice" from "2 real adjacent/stacked units,
+    possibly the same SKU" -- docs/reports/2026-07-28d-nms-iou-duplicate-detection.md."""
+    content: List[Dict] = [
+        _image_block(crop_a),
+        _image_block(crop_b),
+        {"type": "text", "text": _SAME_OBJECT_INSTRUCTION_TEXT},
+    ]
+
+    usage = {"input_tokens": 0, "output_tokens": 0}
+    for attempt in range(max_retries + 1):
+        response = client.messages.create(
+            model=MODEL_ID,
+            max_tokens=512,
+            messages=[{"role": "user", "content": content}],
+            output_config={
+                "format": {
+                    "type": "json_schema",
+                    "schema": {
+                        "type": "object",
+                        "properties": {
+                            "reasoning": {
+                                "type": "string",
+                                "description": _SAME_OBJECT_REASONING_SCHEMA_DESCRIPTION,
+                            },
+                            "answer": {"type": "string", "enum": ["same_object", "different_objects"]},
+                        },
+                        "required": ["reasoning", "answer"],
+                        "additionalProperties": False,
+                    },
+                }
+            },
+        )
+        usage["input_tokens"] += response.usage.input_tokens
+        usage["output_tokens"] += response.usage.output_tokens
+        text = next(b.text for b in response.content if b.type == "text")
+        try:
+            parsed = json.loads(text)
+            return parsed["answer"], parsed.get("reasoning", ""), usage
+        except json.JSONDecodeError:
+            if attempt == max_retries:
+                raise
+
+
+def verify_same_object_gemini(
+    client,
+    crop_a: Image.Image,
+    crop_b: Image.Image,
+    max_retries: int = 2,
+) -> Tuple[str, str, Dict[str, int]]:
+    """Gemini counterpart to verify_same_object -- same interface, prompt, and
+    schema, mirroring escalate_to_llm_gemini's relationship to escalate_to_llm."""
+    from google.genai import types  # deferred: google-genai is an optional dependency, only needed by this provider
+
+    parts: List["types.Part"] = [
+        types.Part.from_bytes(data=_image_bytes(crop_a), mime_type="image/jpeg"),
+        types.Part.from_bytes(data=_image_bytes(crop_b), mime_type="image/jpeg"),
+        types.Part.from_text(text=_SAME_OBJECT_INSTRUCTION_TEXT),
+    ]
+
+    schema = {
+        "type": "object",
+        "properties": {
+            "reasoning": {"type": "string", "description": _SAME_OBJECT_REASONING_SCHEMA_DESCRIPTION},
+            "answer": {"type": "string", "enum": ["same_object", "different_objects"]},
+        },
+        "required": ["reasoning", "answer"],
+        "additionalProperties": False,
+    }
+
+    usage = {"input_tokens": 0, "output_tokens": 0}
+    for attempt in range(max_retries + 1):
+        response = client.models.generate_content(
+            model=GEMINI_MODEL_ID,
+            contents=[types.Content(role="user", parts=parts)],
+            config=types.GenerateContentConfig(
+                response_mime_type="application/json",
+                response_json_schema=schema,
+                max_output_tokens=512,
                 thinking_config=types.ThinkingConfig(thinking_level=types.ThinkingLevel.MINIMAL),
             ),
         )

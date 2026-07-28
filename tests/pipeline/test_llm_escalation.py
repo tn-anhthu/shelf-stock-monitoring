@@ -5,7 +5,12 @@ from types import SimpleNamespace
 import pytest
 from PIL import Image
 
-from src.pipeline.llm_escalation import escalate_to_llm, escalate_to_llm_gemini
+from src.pipeline.llm_escalation import (
+    escalate_to_llm,
+    escalate_to_llm_gemini,
+    verify_same_object,
+    verify_same_object_gemini,
+)
 
 
 FAKE_USAGE = SimpleNamespace(input_tokens=100, output_tokens=20)
@@ -376,3 +381,127 @@ def test_escalate_to_llm_gemini_raises_after_exhausting_retries_on_persistent_ma
         escalate_to_llm_gemini(client, image, candidates, images_dir=str(tmp_path))
 
     assert client.models.calls == 3
+
+
+# --- verify_same_object: 2026-07-28e, IoU-duplicate case (see
+# docs/reports/2026-07-28d-nms-iou-duplicate-detection.md) -- given 2 crops
+# from a high-IoU/high-containment box pair, ask the LLM whether they show the
+# SAME physical product (merge) or 2 DIFFERENT physical units (keep both). ---
+
+
+def test_verify_same_object_returns_answer_and_reasoning(tmp_path):
+    client = FakeLLMClient(answer="same_object", reasoning="Cùng 1 hộp, box dưới chỉ chụp thiếu phần trên")
+    crop_a = Image.new("RGB", (10, 10))
+    crop_b = Image.new("RGB", (10, 12))
+
+    answer, reasoning, usage = verify_same_object(client, crop_a, crop_b)
+
+    assert answer == "same_object"
+    assert reasoning == "Cùng 1 hộp, box dưới chỉ chụp thiếu phần trên"
+    assert usage == {"input_tokens": 100, "output_tokens": 20}
+
+
+def test_verify_same_object_returns_different_objects(tmp_path):
+    client = FakeLLMClient(answer="different_objects", reasoning="2 lốc Yakult xếp chồng, mỗi box lệch nửa lốc")
+    crop_a = Image.new("RGB", (10, 10))
+    crop_b = Image.new("RGB", (10, 12))
+
+    answer, reasoning, _usage = verify_same_object(client, crop_a, crop_b)
+
+    assert answer == "different_objects"
+    assert reasoning == "2 lốc Yakult xếp chồng, mỗi box lệch nửa lốc"
+
+
+def test_verify_same_object_schema_enum_is_same_or_different(tmp_path):
+    client = FakeLLMClient(answer="same_object")
+    crop_a = Image.new("RGB", (10, 10))
+    crop_b = Image.new("RGB", (10, 10))
+
+    verify_same_object(client, crop_a, crop_b)
+
+    schema = client.messages.calls[0]["output_config"]["format"]["schema"]
+    assert schema["properties"]["answer"]["enum"] == ["same_object", "different_objects"]
+    assert list(schema["properties"].keys()) == ["reasoning", "answer"]
+
+
+def test_verify_same_object_sends_both_crops_as_images():
+    client = FakeLLMClient(answer="same_object")
+    crop_a = Image.new("RGB", (10, 10))
+    crop_b = Image.new("RGB", (10, 10))
+
+    verify_same_object(client, crop_a, crop_b)
+
+    content = client.messages.calls[0]["messages"][0]["content"]
+    image_blocks = [c for c in content if c["type"] == "image"]
+    assert len(image_blocks) == 2  # crop_a + crop_b, nothing else (no candidate reference images here)
+
+
+def test_verify_same_object_retries_once_on_malformed_json_then_succeeds():
+    client = FlakyLLMClient(fail_times=1, answer="same_object")
+    crop_a = Image.new("RGB", (10, 10))
+    crop_b = Image.new("RGB", (10, 10))
+
+    answer, _reasoning, usage = verify_same_object(client, crop_a, crop_b)
+
+    assert answer == "same_object"
+    assert client.messages.calls == 2
+    assert usage == {"input_tokens": 200, "output_tokens": 40}
+
+
+def test_verify_same_object_raises_after_exhausting_retries():
+    client = FlakyLLMClient(fail_times=99, answer="same_object")
+    crop_a = Image.new("RGB", (10, 10))
+    crop_b = Image.new("RGB", (10, 10))
+
+    with pytest.raises(json.JSONDecodeError):
+        verify_same_object(client, crop_a, crop_b)
+
+    assert client.messages.calls == 3
+
+
+def test_verify_same_object_gemini_returns_answer_and_reasoning():
+    client = FakeGeminiClient(answer="different_objects", reasoning="2 chai riêng biệt")
+    crop_a = Image.new("RGB", (10, 10))
+    crop_b = Image.new("RGB", (10, 10))
+
+    answer, reasoning, usage = verify_same_object_gemini(client, crop_a, crop_b)
+
+    assert answer == "different_objects"
+    assert reasoning == "2 chai riêng biệt"
+    assert usage == {"input_tokens": 100, "output_tokens": 20}
+
+
+def test_verify_same_object_gemini_schema_enum_is_same_or_different():
+    client = FakeGeminiClient(answer="same_object")
+    crop_a = Image.new("RGB", (10, 10))
+    crop_b = Image.new("RGB", (10, 10))
+
+    verify_same_object_gemini(client, crop_a, crop_b)
+
+    config = client.models.calls[0]["config"]
+    assert config.response_json_schema["properties"]["answer"]["enum"] == ["same_object", "different_objects"]
+
+
+def test_verify_same_object_gemini_minimizes_thinking_to_avoid_output_truncation():
+    from google.genai import types
+
+    client = FakeGeminiClient(answer="same_object")
+    crop_a = Image.new("RGB", (10, 10))
+    crop_b = Image.new("RGB", (10, 10))
+
+    verify_same_object_gemini(client, crop_a, crop_b)
+
+    config = client.models.calls[0]["config"]
+    assert config.thinking_config.thinking_level == types.ThinkingLevel.MINIMAL
+
+
+def test_verify_same_object_gemini_retries_once_on_malformed_json_then_succeeds():
+    client = FlakyGeminiClient(fail_times=1, answer="same_object")
+    crop_a = Image.new("RGB", (10, 10))
+    crop_b = Image.new("RGB", (10, 10))
+
+    answer, _reasoning, usage = verify_same_object_gemini(client, crop_a, crop_b)
+
+    assert answer == "same_object"
+    assert client.models.calls == 2
+    assert usage == {"input_tokens": 200, "output_tokens": 40}
