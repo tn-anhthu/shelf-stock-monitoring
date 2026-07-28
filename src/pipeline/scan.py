@@ -31,12 +31,30 @@ def run_scan(
     detect_fn: Callable,
     embed_fn: Callable,
     llm_client,
+    roi_crop_fn: Optional[Callable] = None,
     depth_by_index: Optional[Dict[int, int]] = None,
     top_k: int = 5,
     images_dir: str = "data/catalog/images",
     max_workers: int = 10,
 ) -> Dict:
     depth_by_index = depth_by_index or {}
+
+    # ROI-crop preprocessing (docs/specs/mvp-design.md section 7): strip out
+    # neighboring shelves/background that sit entirely inside the frame, before
+    # YOLO ever sees the image. Optional and off by default (None) so callers
+    # that don't inject it (and every existing test) get the pre-2026-07-28
+    # behavior unchanged. roi_crop_fn must never raise — src/pipeline/roi_crop.py's
+    # crop_to_roi already catches segmentation failures and returns the original
+    # image with a reason instead; this is just the wiring point, not the
+    # fallback logic itself.
+    roi_crop_applied, roi_crop_reason, roi_crop_bbox = False, "disabled", None
+    if roi_crop_fn is not None:
+        roi_result = roi_crop_fn(image)
+        image = roi_result.image
+        roi_crop_applied = roi_result.applied
+        roi_crop_reason = roi_result.reason
+        roi_crop_bbox = roi_result.bbox
+
     boxes = detect_fn(image)
     boxes = merge_adjacent_fragments(boxes)
     boxes = filter_anomalous_boxes(boxes)
@@ -99,6 +117,11 @@ def run_scan(
         "value": value,
         "flags": flags,
         "gaps": gaps,
+        "roi_crop": {
+            "applied": roi_crop_applied,
+            "reason": roi_crop_reason,
+            "bbox": roi_crop_bbox,
+        },
     }
 
 
