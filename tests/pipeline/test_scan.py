@@ -6,7 +6,7 @@ import numpy as np
 from PIL import Image
 
 from src.catalog.db import create_tables, get_connection
-from src.pipeline.box_filter import filter_anomalous_boxes
+from src.pipeline.box_filter import filter_anomalous_boxes, filter_contained_boxes
 from src.pipeline.box_merge import merge_adjacent_fragments
 from src.pipeline.gap_detection import detect_gaps
 from src.pipeline.roi_crop import RoiCropResult
@@ -127,9 +127,70 @@ def test_run_scan_merges_and_filters_boxes_before_classify_and_gaps():
     )
 
     cleaned_boxes = filter_anomalous_boxes(merge_adjacent_fragments(fake_detect_fn_with_fragments(None)))
+    cleaned_boxes, _flagged = filter_contained_boxes(cleaned_boxes)
     assert len(cleaned_boxes) == 3
     assert len(result["detections"]) == 3
     assert result["gaps"] == detect_gaps(cleaned_boxes)
+
+
+def test_run_scan_drops_redundant_containing_box_and_reports_flagged_regions():
+    # Real Haohao crop_45 coords (see tests/pipeline/test_box_filter.py for the
+    # crop cross-check): box45 swallows box41 entirely and also dips into
+    # box48's region at leftover-coverage level (~0.6, below the 0.8 primary
+    # containment threshold so box48 isn't itself a second "child") - both
+    # regions box45 covers already have their own independent box, so box45
+    # is genuinely redundant.
+    box41_top_cup = (1109.0, 2840.4, 1326.8, 3116.4)
+    box45_both_cups = (1116.5, 2843.7, 1326.5, 3254.9)
+    box48_bottom_cup = (1125.5, 3098.8, 1318.6, 3359.2)
+
+    def detect_fn_containment(image):
+        return [box41_top_cup, box45_both_cups, box48_bottom_cup]
+
+    catalog_items = [{"sku_id": "choco_pie_orion", "name": "Chocopie", "price": 45000, "shelf_full_qty": 10}]
+    catalog_embeddings = [("choco_pie_orion", np.array([1.0, 0.0]))]
+
+    result = run_scan(
+        image=FAKE_IMAGE,
+        catalog_items=catalog_items,
+        catalog_embeddings=catalog_embeddings,
+        detect_fn=detect_fn_containment,
+        embed_fn=fake_embed_fn,
+        llm_client=FakeLLMClient(answer="choco_pie_orion"),
+    )
+
+    assert len(result["detections"]) == 2  # box45 dropped, box41 + box48 kept
+    assert result["flagged_regions"] == []
+
+
+def test_run_scan_flags_redundant_looking_box_when_leftover_uncovered():
+    # Real Binggrae crop_38 coords (see tests/pipeline/test_box_filter.py for
+    # the crop cross-check): box38 swallows box37 (Melon) but also covers a
+    # Strawberry-side region no other box touches at all -> must be kept, not
+    # silently dropped, and surfaced via flagged_regions.
+    box37_melon_only = (702.7, 2476.3, 819.0, 2772.5)
+    box38_melon_and_strawberry = (610.1, 2478.3, 820.7, 2808.7)
+
+    def detect_fn_containment(image):
+        return [box37_melon_only, box38_melon_and_strawberry]
+
+    catalog_items = [{"sku_id": "choco_pie_orion", "name": "Chocopie", "price": 45000, "shelf_full_qty": 10}]
+    catalog_embeddings = [("choco_pie_orion", np.array([1.0, 0.0]))]
+
+    result = run_scan(
+        image=FAKE_IMAGE,
+        catalog_items=catalog_items,
+        catalog_embeddings=catalog_embeddings,
+        detect_fn=detect_fn_containment,
+        embed_fn=fake_embed_fn,
+        llm_client=FakeLLMClient(answer="choco_pie_orion"),
+    )
+
+    assert len(result["detections"]) == 2  # box37 + box38 both kept
+    assert result["flagged_regions"] == [box38_melon_and_strawberry]
+
+
+
 
 
 def test_run_scan_includes_gaps_from_detected_boxes():

@@ -34,6 +34,26 @@ def compute_iou(box_a: Box, box_b: Box) -> float:
     return inter_area / union_area
 
 
+def containment_ratio(box_a: Box, box_b: Box) -> float:
+    """intersection / area(smaller box) — 1.0 means the smaller box is entirely
+    swallowed by the larger one, regardless of how much bigger the larger box
+    is (unlike IoU, which penalizes a big size mismatch). Used by
+    src/pipeline/box_filter.py::filter_contained_boxes to catch duplicate
+    detections where one oversized box swallows a tightly-fit one."""
+    ax1, ay1, ax2, ay2 = box_a
+    bx1, by1, bx2, by2 = box_b
+
+    inter_w = max(0.0, min(ax2, bx2) - max(ax1, bx1))
+    inter_h = max(0.0, min(ay2, by2) - max(ay1, by1))
+    inter_area = inter_w * inter_h
+
+    area_a = max(0.0, ax2 - ax1) * max(0.0, ay2 - ay1)
+    area_b = max(0.0, bx2 - bx1) * max(0.0, by2 - by1)
+    smaller_area = min(area_a, area_b)
+
+    return inter_area / smaller_area if smaller_area > 0 else 0.0
+
+
 def match_boxes(
     pred_boxes: List[Box], gt_boxes: List[Box], iou_threshold: float = 0.5
 ) -> Tuple[int, int, int]:

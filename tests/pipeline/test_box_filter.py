@@ -1,4 +1,4 @@
-from src.pipeline.box_filter import filter_anomalous_boxes
+from src.pipeline.box_filter import filter_anomalous_boxes, filter_contained_boxes
 
 
 def test_filter_anomalous_boxes_removes_clear_outlier_in_row():
@@ -21,3 +21,49 @@ def test_filter_anomalous_boxes_row_with_fewer_than_two_boxes_keeps_all():
 
 def test_filter_anomalous_boxes_empty_returns_empty_list():
     assert filter_anomalous_boxes([]) == []
+
+
+def test_filter_contained_boxes_deletes_redundant_box_haohao_crop45():
+    # Real coords from data/scan_viz/test1 (re-run of detect_1a + merge_adjacent_
+    # fragments + filter_anomalous_boxes on test1.HEIC, cross-checked against
+    # crop_41/45/48_ok.jpg): box41 and box48 are each a tightly-fit, correct
+    # detection of one Hao Hao cup; box45 is an oversized box that swallows
+    # box41 entirely and also dips into box48's region (containment ~0.6) -
+    # both regions box45 covers already have their own independent box, so
+    # box45 is genuinely redundant.
+    box41_top_cup = (1109.0, 2840.4, 1326.8, 3116.4)
+    box45_both_cups = (1116.5, 2843.7, 1326.5, 3254.9)
+    box48_bottom_cup = (1125.5, 3098.8, 1318.6, 3359.2)
+
+    kept, flagged = filter_contained_boxes([box41_top_cup, box45_both_cups, box48_bottom_cup])
+
+    assert set(kept) == {box41_top_cup, box48_bottom_cup}
+    assert flagged == []
+
+
+def test_filter_contained_boxes_flags_instead_of_deleting_binggrae_crop38():
+    # Real coords from data/scan_viz/test1 (cross-checked against crop_37/38_
+    # ok.jpg): box37 is a correct, tightly-fit detection of the Melon carton;
+    # box38 is an oversized box covering both Melon and Strawberry cartons.
+    # Unlike the Haohao case, nothing else in the real 60-box detection list
+    # overlaps box38's Strawberry-side leftover region at all - there's no
+    # independent box to fall back on, so deleting box38 would silently lose
+    # the Strawberry carton entirely.
+    box37_melon_only = (702.7, 2476.3, 819.0, 2772.5)
+    box38_melon_and_strawberry = (610.1, 2478.3, 820.7, 2808.7)
+
+    kept, flagged = filter_contained_boxes([box37_melon_only, box38_melon_and_strawberry])
+
+    assert set(kept) == {box37_melon_only, box38_melon_and_strawberry}
+    assert flagged == [box38_melon_and_strawberry]
+
+
+def test_filter_contained_boxes_no_containment_relationship_keeps_all_unflagged():
+    boxes = [(0, 0, 50, 50), (60, 0, 110, 50)]
+    kept, flagged = filter_contained_boxes(boxes)
+    assert kept == boxes
+    assert flagged == []
+
+
+def test_filter_contained_boxes_empty_returns_empty_lists():
+    assert filter_contained_boxes([]) == ([], [])

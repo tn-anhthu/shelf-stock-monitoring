@@ -7,6 +7,9 @@ intermediate artifact so each pipeline stage is inspectable:
   <out>/1_annotated.jpg       - original + YOLO boxes, color-coded green/red by
                                 match status (labeled sku_id + confidence), plus
                                 orange boxes for detect_gaps() suspected empty gaps
+                                and yellow "NEEDS REVIEW" boxes for
+                                filter_contained_boxes() regions kept but flagged
+                                (ambiguous containment, not a plain unknown match)
   <out>/2_crops_grid.jpg      - contact sheet of every crop_box() output in one image
   <out>/crop_XX_<status>.jpg  - each individual crop as its own file
   stdout                      - per-box detect/crop/classify trace + region-level
@@ -22,9 +25,11 @@ download) — the checkpoint path above matches what's actually on disk today
 (nested runs/detect/runs/train_1a/..., not runs/train_1a/... as written in some
 earlier notes; run `find runs -iname best.pt` to confirm before running).
 
-API key is read from the ANTHROPIC_API_KEY environment variable — either
-export it yourself before running, or put it in a .env file (ANTHROPIC_API_KEY=...,
-gitignored) and it's auto-loaded via python-dotenv if that package is
+Provider is picked by the LLM_PROVIDER env var (anthropic | gemini, default
+anthropic -- same switch as src/pipeline/classify.py's _escalate). The
+matching API key (ANTHROPIC_API_KEY or GEMINI_API_KEY) is read from the
+environment -- either export it yourself before running, or put it in a .env
+file (gitignored) and it's auto-loaded via python-dotenv if that package is
 installed. Never hardcode the key into this or any other file.
 """
 import argparse
@@ -42,6 +47,7 @@ except ImportError:
     pass
 
 import anthropic
+from google import genai
 from PIL import Image, ImageDraw
 import pillow_heif
 pillow_heif.register_heif_opener()
@@ -49,7 +55,7 @@ pillow_heif.register_heif_opener()
 from src.catalog.db import get_connection, list_catalog
 from src.classification.benchmark.embed_siglip2 import embed_image_siglip2, load_model_siglip2
 from src.detection.train.run_trained_1a import detect_1a, load_model_1a
-from src.pipeline.box_filter import filter_anomalous_boxes
+from src.pipeline.box_filter import filter_anomalous_boxes, filter_contained_boxes
 from src.pipeline.box_merge import merge_adjacent_fragments
 from src.pipeline.classify import classify_crops_parallel, load_catalog_embeddings, rank_candidates
 from src.pipeline.confidence import is_low_confidence
@@ -67,19 +73,38 @@ REVIEW_XLSX_PATH = "data/scan_viz/review.xlsx"
 HAIKU_INPUT_COST_PER_MTOK = 1.0
 HAIKU_OUTPUT_COST_PER_MTOK = 5.0
 
+# gemini-3.1-flash-lite pricing (https://ai.google.dev/gemini-api/docs/pricing,
+# checked 2026-07-27), per million tokens -- NOT the same as gemini-3.5-flash-lite
+# ($0.30/$2.50, used by scripts/pilot_gemini_vs_claude.py) -- update these if
+# GEMINI_ESCALATION_MODEL changes to a different model.
+GEMINI_INPUT_COST_PER_MTOK = 0.25
+GEMINI_OUTPUT_COST_PER_MTOK = 1.50
+
 MATCHED_COLOR = (0, 200, 0)
 UNKNOWN_COLOR = (220, 30, 30)
 GAP_COLOR = (255, 140, 0)
+FLAGGED_COLOR = (255, 230, 0)
 
 
-def annotate_and_save(image: Image.Image, per_box_results: list, gaps: list, out_path: Path) -> None:
+def annotate_and_save(
+    image: Image.Image, per_box_results: list, gaps: list, flagged_regions: list, out_path: Path
+) -> None:
+    flagged_set = {tuple(box) for box in flagged_regions}
     canvas = image.convert("RGB").copy()
     draw = ImageDraw.Draw(canvas)
     for r in per_box_results:
         x1, y1, x2, y2 = r["box"]
-        color = MATCHED_COLOR if r["sku_id"] else UNKNOWN_COLOR
+        is_flagged = tuple(r["box"]) in flagged_set
+        color = FLAGGED_COLOR if is_flagged else (MATCHED_COLOR if r["sku_id"] else UNKNOWN_COLOR)
         draw.rectangle([x1, y1, x2, y2], outline=color, width=3)
         label = f'{r["sku_id"] or "unknown"} ({r["score"]:.2f})'
+        if is_flagged:
+            # Distinct from a plain "unknown" match: this box was kept but
+            # flagged by filter_contained_boxes because it's an oversized box
+            # whose leftover region (beyond what another box already covers)
+            # has no independent detection to fall back on - ambiguous
+            # containment, not a classification failure.
+            label += " NEEDS REVIEW"
         text_y = max(0, y1 - 14)
         draw.rectangle([x1, text_y, x1 + 7 * len(label), text_y + 13], fill=color)
         draw.text((x1 + 2, text_y), label, fill=(0, 0, 0))
@@ -121,9 +146,15 @@ def main():
     parser.add_argument("--max-workers", type=int, default=DEFAULT_MAX_WORKERS)
     args = parser.parse_args()
 
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        raise SystemExit("ANTHROPIC_API_KEY not set — export it before running this script.")
-    llm_client = anthropic.Anthropic()
+    provider = os.environ.get("LLM_PROVIDER", "anthropic")
+    if provider == "gemini":
+        if not os.environ.get("GEMINI_API_KEY"):
+            raise SystemExit("GEMINI_API_KEY not set — export it before running this script.")
+        llm_client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+    else:
+        if not os.environ.get("ANTHROPIC_API_KEY"):
+            raise SystemExit("ANTHROPIC_API_KEY not set — export it before running this script.")
+        llm_client = anthropic.Anthropic()
 
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
@@ -147,6 +178,13 @@ def main():
 
     boxes = filter_anomalous_boxes(boxes_merged)
     print(f"After filter_anomalous_boxes: {len(boxes_merged)} -> {len(boxes)} boxes")
+
+    boxes_before_containment = len(boxes)
+    boxes, flagged_regions = filter_contained_boxes(boxes)
+    print(
+        f"After filter_contained_boxes: {boxes_before_containment} -> {len(boxes)} boxes "
+        f"({len(flagged_regions)} flagged for review)"
+    )
 
     gaps = detect_gaps(boxes)
     print(f"Gap detection flagged {len(gaps)} suspicious gap(s)")
@@ -199,7 +237,7 @@ def main():
             crop_thumbs.append(cropped)
             crop_labels.append(f"{tag} {score:.2f}")
 
-    annotate_and_save(shelf_image, per_box_results, gaps, out_dir / "1_annotated.jpg")
+    annotate_and_save(shelf_image, per_box_results, gaps, flagged_regions, out_dir / "1_annotated.jpg")
     build_crops_grid(crop_thumbs, crop_labels, out_dir / "2_crops_grid.jpg")
 
     scores = [r["score"] for r in per_box_results]
@@ -212,9 +250,13 @@ def main():
     else:
         print("\nNo detections — nothing to score.")
 
+    input_cost_per_mtok, output_cost_per_mtok = (
+        (GEMINI_INPUT_COST_PER_MTOK, GEMINI_OUTPUT_COST_PER_MTOK) if provider == "gemini"
+        else (HAIKU_INPUT_COST_PER_MTOK, HAIKU_OUTPUT_COST_PER_MTOK)
+    )
     estimated_cost = (
-        total_input_tokens / 1_000_000 * HAIKU_INPUT_COST_PER_MTOK
-        + total_output_tokens / 1_000_000 * HAIKU_OUTPUT_COST_PER_MTOK
+        total_input_tokens / 1_000_000 * input_cost_per_mtok
+        + total_output_tokens / 1_000_000 * output_cost_per_mtok
     )
     print(
         f"LLM token usage: {total_input_tokens} input, {total_output_tokens} output "

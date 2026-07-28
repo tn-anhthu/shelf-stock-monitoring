@@ -36,10 +36,12 @@ from typing import Dict, List, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from src.detection.benchmark.metrics import Box, compute_iou
+from src.detection.benchmark.metrics import Box, compute_iou, containment_ratio
 
 # containment >= this and iou below the model's NMS default (0.7) is the
 # "high containment, only moderate/low IoU" signature this script checks for.
+# Same thresholds src/pipeline/box_filter.py::filter_contained_boxes now uses
+# in production, since this script's hypothesis check is what justified them.
 CONTAINMENT_THRESHOLD = 0.8
 NMS_DEFAULT_IOU = 0.7
 
@@ -59,24 +61,6 @@ KNOWN_CASES: Dict[str, Dict[str, Box]] = {
         "box45_both_cups": (1116.5, 2843.7, 1326.5, 3254.9),
     },
 }
-
-
-def box_area(box: Box) -> float:
-    x1, y1, x2, y2 = box
-    return max(0.0, x2 - x1) * max(0.0, y2 - y1)
-
-
-def containment_ratio(a: Box, b: Box) -> float:
-    """intersection / area(smaller box) — 1.0 means the smaller box is
-    entirely swallowed by the larger one, regardless of how much bigger the
-    larger box is (unlike IoU, which penalizes a big size mismatch)."""
-    ax1, ay1, ax2, ay2 = a
-    bx1, by1, bx2, by2 = b
-    inter_w = max(0.0, min(ax2, bx2) - max(ax1, bx1))
-    inter_h = max(0.0, min(ay2, by2) - max(ay1, by1))
-    inter_area = inter_w * inter_h
-    smaller_area = min(box_area(a), box_area(b))
-    return inter_area / smaller_area if smaller_area > 0 else 0.0
 
 
 def main():
