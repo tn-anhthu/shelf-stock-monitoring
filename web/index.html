@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <title>ShelfSense</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <h1>ShelfSense — quét kệ hàng</h1>
+
+  <form id="scan-form">
+    <label>
+      Store ID
+      <input type="text" name="store_id" required />
+    </label>
+    <label>
+      Shelf ID
+      <input type="text" name="shelf_id" required />
+    </label>
+    <label>
+      Ảnh kệ hàng
+      <input type="file" name="image" accept="image/*" required />
+    </label>
+    <button type="submit">Quét</button>
+  </form>
+
+  <p id="status-message" hidden></p>
+
+  <section id="result" hidden>
+    <h2>Boxes</h2>
+    <table id="boxes-table">
+      <thead>
+        <tr>
+          <th>box_id</th>
+          <th>type</th>
+          <th>sku_name</th>
+          <th>confidence</th>
+          <th>is_unknown</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <h2>Quantities</h2>
+    <table id="quantities-table">
+      <thead>
+        <tr>
+          <th>sku_name</th>
+          <th>facing / full</th>
+          <th>unit_price</th>
+          <th>subtotal</th>
+          <th>flag_status</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <p id="total-value"></p>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>

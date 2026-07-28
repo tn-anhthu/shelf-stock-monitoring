@@ -44,3 +44,7 @@ data/scan_viz/*
 .claude/worktrees/
 docs/superpowers/
 .superpowers/
+
+# ml-service / api (ADR-001)
+.venv-ml-service/
+node_modules/
