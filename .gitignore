@@ -49,3 +49,4 @@ docs/superpowers/
 .venv-ml-service/
 node_modules/
 web/dist/
+api/scans.db
