@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import UploadStep from '../components/wizard/UploadStep.jsx';
-import StepIndicator from '../components/StepIndicator.jsx';
+import UploadStep from '../features/scan-wizard/UploadStep.jsx';
+import StepIndicator from '../features/scan-wizard/StepIndicator.jsx';
 
 const STEPS = ['upload', 'crop', 'edit', 'confirm'];
 

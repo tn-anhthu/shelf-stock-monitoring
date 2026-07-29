@@ -1,4 +1,4 @@
-import Sidebar from './components/Sidebar.jsx';
+import Sidebar from './shared/Sidebar.jsx';
 import ScanPage from './pages/ScanPage.jsx';
 
 export default function App() {
