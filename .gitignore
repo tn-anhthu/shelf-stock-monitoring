@@ -48,3 +48,4 @@ docs/superpowers/
 # ml-service / api (ADR-001)
 .venv-ml-service/
 node_modules/
+web/dist/

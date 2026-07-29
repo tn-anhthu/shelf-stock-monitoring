@@ -4,7 +4,7 @@ const analyzeRouter = require('./routes/analyze');
 
 const app = express();
 
-app.use(express.static(path.resolve(__dirname, '..', '..', 'web')));
+app.use(express.static(path.resolve(__dirname, '..', '..', 'web', 'dist')));
 app.use(analyzeRouter);
 
 module.exports = app;
