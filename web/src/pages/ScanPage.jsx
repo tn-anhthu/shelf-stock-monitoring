@@ -2,8 +2,10 @@ import { useEffect, useState } from 'react';
 import UploadStep from '../features/scan-wizard/UploadStep.jsx';
 import CropStep from '../features/scan-wizard/CropStep.jsx';
 import EditStep from '../features/scan-wizard/EditStep.jsx';
+import ConfirmStep from '../features/scan-wizard/ConfirmStep.jsx';
 import StepIndicator from '../features/scan-wizard/StepIndicator.jsx';
-import { analyzeImage, fetchCatalog } from '../features/scan-wizard/api.js';
+import { analyzeImage, confirmScan, fetchCatalog } from '../features/scan-wizard/api.js';
+import { computeTotalValue } from '../features/scan-wizard/quantities.js';
 
 const STEPS = ['upload', 'crop', 'edit', 'confirm'];
 
@@ -17,6 +19,9 @@ export default function ScanPage() {
   const [catalog, setCatalog] = useState([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState(null);
+  const [confirming, setConfirming] = useState(false);
+  const [confirmError, setConfirmError] = useState(null);
+  const [confirmed, setConfirmed] = useState(false);
 
   useEffect(() => {
     fetchCatalog().then(setCatalog).catch(() => setCatalog([]));
@@ -54,6 +59,37 @@ export default function ScanPage() {
     }
   }
 
+  async function handleConfirm() {
+    setConfirming(true);
+    setConfirmError(null);
+    try {
+      await confirmScan({
+        scan_id: analyzeResult.scan_id,
+        store_id: storeId,
+        shelf_id: shelfId,
+        quantities,
+        total_value: computeTotalValue(quantities),
+      });
+      setConfirmed(true);
+    } catch (err) {
+      setConfirmError(err.message);
+    } finally {
+      setConfirming(false);
+    }
+  }
+
+  function handleReset() {
+    setStep('upload');
+    setStoreId('');
+    setShelfId('');
+    setOriginalFile(null);
+    setAnalyzeResult(null);
+    setQuantities([]);
+    setAnalyzeError(null);
+    setConfirmError(null);
+    setConfirmed(false);
+  }
+
   return (
     <div className="mx-auto max-w-3xl">
       <StepIndicator steps={STEPS} current={step} />
@@ -75,7 +111,18 @@ export default function ScanPage() {
           onNext={() => setStep('confirm')}
         />
       )}
-      {step === 'confirm' && <p className="text-slate-500">Bước Confirm — đang xây dựng.</p>}
+      {step === 'confirm' && (
+        <ConfirmStep
+          storeId={storeId}
+          shelfId={shelfId}
+          quantities={quantities}
+          confirming={confirming}
+          confirmError={confirmError}
+          confirmed={confirmed}
+          onConfirm={handleConfirm}
+          onReset={handleReset}
+        />
+      )}
     </div>
   );
 }
