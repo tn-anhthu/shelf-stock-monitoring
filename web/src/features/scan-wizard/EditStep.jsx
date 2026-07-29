@@ -26,9 +26,11 @@ export default function EditStep({ quantities, setQuantities, catalog, boxes, on
   function handleQuantityChange(index, rawValue) {
     const value = Number(rawValue);
     if (!isValidQuantity(value)) return;
+    const depth = quantities[index].depth ?? 1;
     updateRow(index, {
       facing_count: value,
-      total_quantity: value * (quantities[index].depth ?? 1),
+      total_quantity: value * depth,
+      subtotal: value * depth * quantities[index].unit_price,
     });
   }
 
@@ -37,12 +39,16 @@ export default function EditStep({ quantities, setQuantities, catalog, boxes, on
     if (!catalogEntry) return;
     const otherRows = quantities.filter((_, i) => i !== index);
     if (isDuplicateSku(otherRows, skuId)) return;
+    const { facing_count } = quantities[index];
+    const depth = quantities[index].depth ?? 1;
     updateRow(index, {
       sku_id: catalogEntry.sku_id,
       sku_name: catalogEntry.name,
       unit_price: catalogEntry.price,
       shelf_full_qty: catalogEntry.shelf_full_qty,
       flag_status: null,
+      total_quantity: facing_count * depth,
+      subtotal: facing_count * depth * catalogEntry.price,
     });
   }
 
