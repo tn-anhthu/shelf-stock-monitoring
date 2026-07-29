@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import UploadStep from '../features/scan-wizard/UploadStep.jsx';
 import CropStep from '../features/scan-wizard/CropStep.jsx';
+import EditStep from '../features/scan-wizard/EditStep.jsx';
 import StepIndicator from '../features/scan-wizard/StepIndicator.jsx';
-import { analyzeImage } from '../features/scan-wizard/api.js';
+import { analyzeImage, fetchCatalog } from '../features/scan-wizard/api.js';
 
 const STEPS = ['upload', 'crop', 'edit', 'confirm'];
 
@@ -12,8 +13,14 @@ export default function ScanPage() {
   const [shelfId, setShelfId] = useState('');
   const [originalFile, setOriginalFile] = useState(null);
   const [analyzeResult, setAnalyzeResult] = useState(null);
+  const [quantities, setQuantities] = useState([]);
+  const [catalog, setCatalog] = useState([]);
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeError, setAnalyzeError] = useState(null);
+
+  useEffect(() => {
+    fetchCatalog().then(setCatalog).catch(() => setCatalog([]));
+  }, []);
 
   function handleUploadNext({ storeId, shelfId, file }) {
     setStoreId(storeId);
@@ -38,6 +45,7 @@ export default function ScanPage() {
         return;
       }
       setAnalyzeResult(result);
+      setQuantities(result.quantities.map((q) => ({ ...q })));
       setStep('edit');
     } catch (err) {
       setAnalyzeError(err.message);
@@ -59,12 +67,13 @@ export default function ScanPage() {
         />
       )}
       {step === 'edit' && (
-        <div className="space-y-2 text-slate-500">
-          <p>Bước Edit — đang xây dựng.</p>
-          <pre className="overflow-auto rounded bg-slate-100 p-3 text-xs">
-            {JSON.stringify(analyzeResult?.quantities, null, 2)}
-          </pre>
-        </div>
+        <EditStep
+          quantities={quantities}
+          setQuantities={setQuantities}
+          catalog={catalog}
+          boxes={analyzeResult?.boxes ?? []}
+          onNext={() => setStep('confirm')}
+        />
       )}
       {step === 'confirm' && <p className="text-slate-500">Bước Confirm — đang xây dựng.</p>}
     </div>
