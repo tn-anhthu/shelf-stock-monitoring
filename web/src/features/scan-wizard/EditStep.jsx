@@ -1,13 +1,8 @@
 import { useState } from 'react';
 import { computeTotalValue, isDuplicateSku } from './quantities.js';
-
-const currency = (n) => n.toLocaleString('vi-VN') + ' đ';
-
-const FLAG_STYLES = {
-  ok: 'text-emerald-700',
-  low: 'text-amber-700 font-semibold',
-  out: 'text-red-700 font-semibold',
-};
+import EditStepTable from './EditStepTable.jsx';
+import EditStepCards from './EditStepCards.jsx';
+import Button from '../../shared/ui/Button.jsx';
 
 function isValidQuantity(value) {
   return Number.isInteger(value) && value >= 0;
@@ -78,78 +73,27 @@ export default function EditStep({ quantities, setQuantities, catalog, boxes, on
   }
 
   return (
-    <div className="space-y-4">
-      <h2 className="text-lg font-semibold">3. Kiểm tra & sửa số lượng</h2>
+    <div className="space-y-4 pb-16 md:pb-4">
+      <h2 className="font-heading text-lg font-semibold text-ink">3. Kiểm tra & sửa số lượng</h2>
 
-      <table className="w-full border-collapse text-sm">
-        <thead>
-          <tr className="border-b text-left">
-            <th className="py-2">Sản phẩm</th>
-            <th>SKU</th>
-            <th>Số lượng</th>
-            <th>Đơn giá</th>
-            <th>Thành tiền</th>
-            <th>Trạng thái</th>
-            <th />
-          </tr>
-        </thead>
-        <tbody>
-          {quantities.map((q, index) => {
-            const otherRows = quantities.filter((_, i) => i !== index);
-            const skuOptions = catalog.filter(
-              (item) => item.sku_id === q.sku_id || !isDuplicateSku(otherRows, item.sku_id),
-            );
-            return (
-              <tr key={`${q.sku_id}-${index}`} className="border-b">
-                <td className="py-2">{q.sku_name}</td>
-                <td>
-                  <select
-                    value={q.sku_id}
-                    onChange={(e) => handleSkuChange(index, e.target.value)}
-                    className="rounded border px-2 py-1"
-                  >
-                    {skuOptions.map((item) => (
-                      <option key={item.sku_id} value={item.sku_id}>
-                        {item.sku_id}
-                      </option>
-                    ))}
-                  </select>
-                </td>
-                <td>
-                  <input
-                    type="number"
-                    min="0"
-                    step="1"
-                    value={q.facing_count}
-                    onChange={(e) => handleQuantityChange(index, e.target.value)}
-                    className="w-20 rounded border px-2 py-1"
-                  />
-                </td>
-                <td>{currency(q.unit_price)}</td>
-                <td>{currency(q.facing_count * (q.depth ?? 1) * q.unit_price)}</td>
-                <td>
-                  {q.flag_status ? (
-                    <span className={FLAG_STYLES[q.flag_status]}>{q.flag_status}</span>
-                  ) : (
-                    '—'
-                  )}
-                </td>
-                <td>
-                  <button type="button" onClick={() => handleRemoveRow(index)} className="text-red-600">
-                    Xóa
-                  </button>
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+      <EditStepTable
+        quantities={quantities}
+        catalog={catalog}
+        onQuantityChange={handleQuantityChange}
+        onSkuChange={handleSkuChange}
+        onRemoveRow={handleRemoveRow}
+      />
+      <EditStepCards
+        quantities={quantities}
+        onQuantityChange={handleQuantityChange}
+        onRemoveRow={handleRemoveRow}
+      />
 
       <div className="flex items-center gap-2">
         <select
           value={newSkuId}
           onChange={(e) => setNewSkuId(e.target.value)}
-          className="rounded border px-2 py-1"
+          className="rounded-lg border border-card-border px-2 py-1"
         >
           <option value="">-- chọn SKU để thêm --</option>
           {availableToAdd.map((item) => (
@@ -158,20 +102,17 @@ export default function EditStep({ quantities, setQuantities, catalog, boxes, on
             </option>
           ))}
         </select>
-        <button
-          type="button"
-          onClick={handleAddRow}
-          disabled={!newSkuId}
-          className="rounded border px-3 py-1 disabled:opacity-50"
-        >
+        <Button type="button" variant="outline" onClick={handleAddRow} disabled={!newSkuId}>
           Thêm dòng
-        </button>
+        </Button>
       </div>
 
-      <p className="text-lg font-semibold">Tổng giá trị: {currency(totalValue)}</p>
+      <div className="fixed inset-x-0 bottom-16 border-t border-card-border bg-white p-3 md:static md:border-0 md:bg-transparent md:p-0">
+        <p className="font-heading text-lg font-semibold text-ink">Tổng giá trị: {totalValue.toLocaleString('vi-VN')} đ</p>
+      </div>
 
-      <details className="rounded border p-3">
-        <summary className="cursor-pointer font-medium">Xem chi tiết kỹ thuật</summary>
+      <details className="rounded-lg border border-card-border p-3">
+        <summary className="cursor-pointer font-medium text-ink">Xem chi tiết kỹ thuật</summary>
         <table className="mt-2 w-full text-xs">
           <thead>
             <tr className="text-left">
@@ -196,9 +137,9 @@ export default function EditStep({ quantities, setQuantities, catalog, boxes, on
         </table>
       </details>
 
-      <button type="button" onClick={onNext} className="rounded bg-slate-900 px-4 py-2 text-white">
+      <Button type="button" onClick={onNext} className="w-full md:w-auto">
         Tiếp tục
-      </button>
+      </Button>
     </div>
   );
 }
