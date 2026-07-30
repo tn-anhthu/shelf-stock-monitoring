@@ -12,8 +12,8 @@ export default function StepIndicator({ steps, current }) {
       {steps.map((step, index) => (
         <li
           key={step}
-          className={`flex-1 rounded px-3 py-2 text-center ${
-            index <= currentIndex ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'
+          className={`flex-1 rounded-lg px-3 py-2 text-center font-heading font-medium ${
+            index <= currentIndex ? 'bg-ink text-white' : 'bg-page text-text-muted'
           }`}
         >
           {index + 1}. {LABELS[step]}

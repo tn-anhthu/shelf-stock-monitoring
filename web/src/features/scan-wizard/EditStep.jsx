@@ -73,7 +73,7 @@ export default function EditStep({ quantities, setQuantities, catalog, boxes, on
   }
 
   return (
-    <div className="space-y-4 pb-16 md:pb-4">
+    <div className="space-y-4 pb-32 md:pb-4">
       <h2 className="font-heading text-lg font-semibold text-ink">3. Kiểm tra & sửa số lượng</h2>
 
       <EditStepTable
