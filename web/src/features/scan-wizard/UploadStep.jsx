@@ -1,11 +1,30 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import Button from '../../shared/ui/Button.jsx';
+import Input from '../../shared/ui/Input.jsx';
 
 export default function UploadStep({ onNext }) {
   const [storeId, setStoreId] = useState('');
   const [shelfId, setShelfId] = useState('');
   const [file, setFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const cameraInputRef = useRef(null);
+  const galleryInputRef = useRef(null);
+
+  useEffect(() => {
+    if (!file) {
+      setPreviewUrl(null);
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setPreviewUrl(url);
+    return () => URL.revokeObjectURL(url);
+  }, [file]);
 
   const canSubmit = storeId.trim() && shelfId.trim() && file;
+
+  function handleFileChange(event) {
+    setFile(event.target.files?.[0] ?? null);
+  }
 
   function handleSubmit(event) {
     event.preventDefault();
@@ -15,44 +34,74 @@ export default function UploadStep({ onNext }) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <h2 className="text-lg font-semibold">1. Chọn ảnh kệ hàng</h2>
+      <h2 className="font-heading text-lg font-semibold text-ink">1. Chọn ảnh kệ hàng</h2>
+
       <label className="block">
-        <span className="text-sm font-medium">Store ID</span>
-        <input
+        <span className="text-sm font-medium text-ink">Store ID</span>
+        <Input
           type="text"
           value={storeId}
           onChange={(e) => setStoreId(e.target.value)}
           required
-          className="mt-1 w-full rounded border px-3 py-2"
+          className="mt-1"
         />
       </label>
+
       <label className="block">
-        <span className="text-sm font-medium">Shelf ID</span>
-        <input
+        <span className="text-sm font-medium text-ink">Shelf ID</span>
+        <Input
           type="text"
           value={shelfId}
           onChange={(e) => setShelfId(e.target.value)}
           required
-          className="mt-1 w-full rounded border px-3 py-2"
+          className="mt-1"
         />
       </label>
-      <label className="block">
-        <span className="text-sm font-medium">Ảnh kệ hàng</span>
+
+      <div>
+        <span className="text-sm font-medium text-ink">Ảnh kệ hàng</span>
+
+        {previewUrl ? (
+          <img
+            src={previewUrl}
+            alt="Ảnh kệ hàng đã chọn"
+            className="mt-2 h-48 w-full rounded-xl border border-card-border object-cover"
+          />
+        ) : (
+          <div className="mt-2 flex h-32 items-center justify-center rounded-xl border border-dashed border-card-border text-sm text-text-muted">
+            Chưa có ảnh
+          </div>
+        )}
+
         <input
+          ref={cameraInputRef}
           type="file"
           accept="image/*"
-          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          required
-          className="mt-1 block"
+          capture="environment"
+          onChange={handleFileChange}
+          className="hidden"
         />
-      </label>
-      <button
-        type="submit"
-        disabled={!canSubmit}
-        className="rounded bg-slate-900 px-4 py-2 text-white disabled:opacity-50"
-      >
+        <input
+          ref={galleryInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileChange}
+          className="hidden"
+        />
+
+        <div className="mt-2 flex gap-2">
+          <Button type="button" variant="outline" className="flex-1" onClick={() => cameraInputRef.current?.click()}>
+            Chụp ảnh
+          </Button>
+          <Button type="button" variant="outline" className="flex-1" onClick={() => galleryInputRef.current?.click()}>
+            Thư viện
+          </Button>
+        </div>
+      </div>
+
+      <Button type="submit" disabled={!canSubmit} className="w-full">
         Tiếp tục
-      </button>
+      </Button>
     </form>
   );
 }
