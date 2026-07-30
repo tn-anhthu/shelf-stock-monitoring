@@ -15,6 +15,11 @@ from PIL import Image
 
 app = FastAPI(title="shelf-stock-monitoring ml-service")
 
+# NOTE: these mock bbox pixel coordinates are NOT scaled to the real uploaded
+# image's width/height (returned separately via img.size below), so on real
+# (non-mock-sized) photos the boxes will visually misalign / cluster in a
+# corner. This is expected and will self-resolve once real CV integration
+# replaces this mock and returns boxes already scaled to the actual image.
 _MOCK_BOXES = [
     {
         "box_id": "b1",

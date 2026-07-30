@@ -6,6 +6,20 @@ const NEUTRAL_VARIANT_STYLE = {
   gap: { border: '2px dashed #E2E8F0', background: 'transparent' },
 };
 
+// statusStyles.js returns fully opaque hex backgrounds meant for StatusChip's
+// solid chip fill. Box overlays sit on top of the shelf photo, so we need a
+// translucent version here instead — this keeps the photo visible underneath
+// while still color-coding ok/low/out at a glance.
+const BOX_FILL_OPACITY = 0.25;
+
+export function hexToRgba(hex, alpha) {
+  const normalized = hex.replace('#', '');
+  const r = parseInt(normalized.slice(0, 2), 16);
+  const g = parseInt(normalized.slice(2, 4), 16);
+  const b = parseInt(normalized.slice(4, 6), 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 export default function BboxOverlay({ imageUrl, imageWidth, imageHeight, boxes, quantities, hoveredSkuId, onHoverSku }) {
   if (!imageUrl || !imageWidth || !imageHeight) {
     return (
@@ -33,7 +47,7 @@ export default function BboxOverlay({ imageUrl, imageWidth, imageHeight, boxes, 
           if (style.variant === 'product') {
             const statusStyle = getStatusStyle(style.flagStatus) ?? { bg: 'transparent', text: '#94A3B8' };
             border = `${isHovered ? 3 : 2}px solid ${statusStyle.text}`;
-            background = statusStyle.bg;
+            background = statusStyle.bg === 'transparent' ? 'transparent' : hexToRgba(statusStyle.bg, BOX_FILL_OPACITY);
           } else {
             border = NEUTRAL_VARIANT_STYLE[style.variant].border;
             background = NEUTRAL_VARIANT_STYLE[style.variant].background;
