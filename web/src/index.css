@@ -1,1 +1,22 @@
 @import "tailwindcss";
+
+@theme {
+  --color-ink: #18181B;
+  --color-page: #F8FAFC;
+  --color-card-border: #E2E8F0;
+  --color-text-secondary: #64748B;
+  --color-text-muted: #94A3B8;
+
+  --color-status-ok-bg: #EAF3DE;
+  --color-status-ok-text: #173404;
+  --color-status-low-bg: #FAEEDA;
+  --color-status-low-text: #412402;
+  --color-status-out-bg: #FCEBEB;
+  --color-status-out-text: #501313;
+
+  --font-heading: "Be Vietnam Pro", sans-serif;
+}
+
+body {
+  -webkit-font-smoothing: antialiased;
+}
