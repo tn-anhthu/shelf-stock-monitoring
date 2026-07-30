@@ -1,17 +1,14 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef } from 'react';
 import { Cropper } from 'react-cropper';
 import 'cropperjs/dist/cropper.css';
 import Button from '../../shared/ui/Button.jsx';
+import { useObjectUrl } from '../../shared/useObjectUrl.js';
 
 const CORNER_BASE = 'pointer-events-none absolute h-6 w-6 border-ink';
 
 export default function CropStep({ originalFile, analyzing, analyzeError, onAnalyze }) {
   const cropperRef = useRef(null);
-  const [imageUrl] = useState(() => URL.createObjectURL(originalFile));
-
-  useEffect(() => {
-    return () => URL.revokeObjectURL(imageUrl);
-  }, [imageUrl]);
+  const imageUrl = useObjectUrl(originalFile);
 
   function handleAnalyzeClick() {
     const cropper = cropperRef.current?.cropper;
@@ -35,14 +32,16 @@ export default function CropStep({ originalFile, analyzing, analyzeError, onAnal
       )}
 
       <div className="relative">
-        <Cropper
-          src={imageUrl}
-          style={{ height: 420, width: '100%' }}
-          autoCropArea={0.9}
-          viewMode={1}
-          guides
-          ref={cropperRef}
-        />
+        {imageUrl && (
+          <Cropper
+            src={imageUrl}
+            style={{ height: 420, width: '100%' }}
+            autoCropArea={0.9}
+            viewMode={1}
+            guides
+            ref={cropperRef}
+          />
+        )}
         <span className={`${CORNER_BASE} left-2 top-2 border-l-2 border-t-2`} />
         <span className={`${CORNER_BASE} right-2 top-2 border-r-2 border-t-2`} />
         <span className={`${CORNER_BASE} bottom-2 left-2 border-b-2 border-l-2`} />

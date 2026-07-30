@@ -97,7 +97,7 @@ export default function ScanPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-6xl">
       <StepIndicator steps={STEPS} current={step} />
       {step === 'upload' && <UploadStep onNext={handleUploadNext} />}
       {step === 'crop' && originalFile && (

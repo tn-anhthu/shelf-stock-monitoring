@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { computeTotalValue, isDuplicateSku } from './quantities.js';
 import EditStepTable from './EditStepTable.jsx';
 import EditStepCards from './EditStepCards.jsx';
@@ -19,8 +19,28 @@ export default function EditStep({
   imageHeight,
   onNext,
 }) {
-  const [newSkuId, setNewSkuId] = useState('');
   const [hoveredSkuId, setHoveredSkuId] = useState(null);
+  const [leftWidth, setLeftWidth] = useState(50);
+  const containerRef = useRef(null);
+  const draggingRef = useRef(false);
+
+  useEffect(() => {
+    function handleMouseMove(e) {
+      if (!draggingRef.current || !containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const percent = ((e.clientX - rect.left) / rect.width) * 100;
+      setLeftWidth(Math.min(70, Math.max(25, percent)));
+    }
+    function handleMouseUp() {
+      draggingRef.current = false;
+    }
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, []);
 
   const totalValue = computeTotalValue(quantities);
   const availableToAdd = catalog.filter((item) => !isDuplicateSku(quantities, item.sku_id));
@@ -63,8 +83,7 @@ export default function EditStep({
   }
 
   function handleAddRow() {
-    if (!newSkuId || isDuplicateSku(quantities, newSkuId)) return;
-    const catalogEntry = catalog.find((item) => item.sku_id === newSkuId);
+    const catalogEntry = availableToAdd[0];
     if (!catalogEntry) return;
     setQuantities((prev) => [
       ...prev,
@@ -80,24 +99,31 @@ export default function EditStep({
         flag_status: null,
       },
     ]);
-    setNewSkuId('');
   }
 
   return (
     <div className="space-y-4 pb-32 md:pb-4">
       <h2 className="font-heading text-lg font-semibold text-ink">3. Kiểm tra & sửa số lượng</h2>
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <BboxOverlay
-          imageUrl={imageUrl}
-          imageWidth={imageWidth}
-          imageHeight={imageHeight}
-          boxes={boxes}
-          quantities={quantities}
-          hoveredSkuId={hoveredSkuId}
-          onHoverSku={setHoveredSkuId}
+      <div ref={containerRef} className="hidden md:flex">
+        <div style={{ width: `${leftWidth}%` }} className="pr-3">
+          <BboxOverlay
+            imageUrl={imageUrl}
+            imageWidth={imageWidth}
+            imageHeight={imageHeight}
+            boxes={boxes}
+            quantities={quantities}
+            hoveredSkuId={hoveredSkuId}
+            onHoverSku={setHoveredSkuId}
+          />
+        </div>
+        <div
+          onMouseDown={() => {
+            draggingRef.current = true;
+          }}
+          className="w-1 shrink-0 cursor-col-resize rounded bg-card-border hover:bg-ink"
         />
-        <div>
+        <div style={{ width: `${100 - leftWidth}%` }} className="min-w-0 pl-3">
           <EditStepTable
             quantities={quantities}
             catalog={catalog}
@@ -107,31 +133,37 @@ export default function EditStep({
             hoveredSkuId={hoveredSkuId}
             onRowHover={setHoveredSkuId}
           />
-          <EditStepCards
-            quantities={quantities}
-            onQuantityChange={handleQuantityChange}
-            onRemoveRow={handleRemoveRow}
-            hoveredSkuId={hoveredSkuId}
-            onRowHover={setHoveredSkuId}
-          />
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleAddRow}
+            disabled={availableToAdd.length === 0}
+            className="mt-3"
+          >
+            + Thêm dòng
+          </Button>
         </div>
       </div>
 
-      <div className="flex items-center gap-2">
-        <select
-          value={newSkuId}
-          onChange={(e) => setNewSkuId(e.target.value)}
-          className="rounded-lg border border-card-border px-2 py-1"
-        >
-          <option value="">-- chọn SKU để thêm --</option>
-          {availableToAdd.map((item) => (
-            <option key={item.sku_id} value={item.sku_id}>
-              {item.name}
-            </option>
-          ))}
-        </select>
-        <Button type="button" variant="outline" onClick={handleAddRow} disabled={!newSkuId}>
-          Thêm dòng
+      <div className="space-y-4 md:hidden">
+        <BboxOverlay
+          imageUrl={imageUrl}
+          imageWidth={imageWidth}
+          imageHeight={imageHeight}
+          boxes={boxes}
+          quantities={quantities}
+          hoveredSkuId={hoveredSkuId}
+          onHoverSku={setHoveredSkuId}
+        />
+        <EditStepCards
+          quantities={quantities}
+          onQuantityChange={handleQuantityChange}
+          onRemoveRow={handleRemoveRow}
+          hoveredSkuId={hoveredSkuId}
+          onRowHover={setHoveredSkuId}
+        />
+        <Button type="button" variant="outline" onClick={handleAddRow} disabled={availableToAdd.length === 0}>
+          + Thêm dòng
         </Button>
       </div>
 

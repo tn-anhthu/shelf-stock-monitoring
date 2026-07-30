@@ -5,7 +5,7 @@ const currency = (n) => n.toLocaleString('vi-VN') + ' đ';
 
 export default function EditStepCards({ quantities, onQuantityChange, onRemoveRow, hoveredSkuId, onRowHover }) {
   return (
-    <div className="space-y-3 md:hidden">
+    <div className="space-y-3">
       {quantities.map((q, index) => {
         const depth = q.depth ?? 1;
         const isHovered = hoveredSkuId === q.sku_id;

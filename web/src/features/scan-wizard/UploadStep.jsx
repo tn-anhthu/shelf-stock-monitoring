@@ -1,24 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import Button from '../../shared/ui/Button.jsx';
 import Input from '../../shared/ui/Input.jsx';
+import { useObjectUrl } from '../../shared/useObjectUrl.js';
 
 export default function UploadStep({ onNext }) {
   const [storeId, setStoreId] = useState('');
   const [shelfId, setShelfId] = useState('');
   const [file, setFile] = useState(null);
-  const [previewUrl, setPreviewUrl] = useState(null);
+  const previewUrl = useObjectUrl(file);
   const cameraInputRef = useRef(null);
   const galleryInputRef = useRef(null);
-
-  useEffect(() => {
-    if (!file) {
-      setPreviewUrl(null);
-      return;
-    }
-    const url = URL.createObjectURL(file);
-    setPreviewUrl(url);
-    return () => URL.revokeObjectURL(url);
-  }, [file]);
 
   const canSubmit = storeId.trim() && shelfId.trim() && file;
 
