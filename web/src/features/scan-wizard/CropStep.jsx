@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Cropper } from 'react-cropper';
 import 'cropperjs/dist/cropper.css';
+import Button from '../../shared/ui/Button.jsx';
+
+const CORNER_BASE = 'pointer-events-none absolute h-6 w-6 border-ink';
 
 export default function CropStep({ originalFile, analyzing, analyzeError, onAnalyze }) {
   const cropperRef = useRef(null);
@@ -25,24 +28,33 @@ export default function CropStep({ originalFile, analyzing, analyzeError, onAnal
 
   return (
     <div className="space-y-4">
-      <h2 className="text-lg font-semibold">2. Chỉnh vùng kệ hàng</h2>
-      {analyzeError && <p className="rounded bg-red-50 px-3 py-2 text-red-700">{analyzeError}</p>}
-      <Cropper
-        src={imageUrl}
-        style={{ height: 420, width: '100%' }}
-        autoCropArea={0.9}
-        viewMode={1}
-        guides
-        ref={cropperRef}
-      />
-      <button
-        type="button"
-        onClick={handleAnalyzeClick}
-        disabled={analyzing}
-        className="rounded bg-slate-900 px-4 py-2 text-white disabled:opacity-50"
-      >
+      <h2 className="font-heading text-lg font-semibold text-ink">2. Chỉnh vùng kệ hàng</h2>
+
+      {analyzeError && (
+        <p className="rounded-lg bg-status-out-bg px-3 py-2 text-sm text-status-out-text">{analyzeError}</p>
+      )}
+
+      <div className="relative">
+        <Cropper
+          src={imageUrl}
+          style={{ height: 420, width: '100%' }}
+          autoCropArea={0.9}
+          viewMode={1}
+          guides
+          ref={cropperRef}
+        />
+        <span className={`${CORNER_BASE} left-2 top-2 border-l-2 border-t-2`} />
+        <span className={`${CORNER_BASE} right-2 top-2 border-r-2 border-t-2`} />
+        <span className={`${CORNER_BASE} bottom-2 left-2 border-b-2 border-l-2`} />
+        <span className={`${CORNER_BASE} bottom-2 right-2 border-b-2 border-r-2`} />
+      </div>
+
+      <Button type="button" onClick={handleAnalyzeClick} disabled={analyzing} className="flex items-center gap-2">
+        {analyzing && (
+          <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+        )}
         {analyzing ? 'Đang phân tích…' : 'Phân tích'}
-      </button>
+      </Button>
     </div>
   );
 }
