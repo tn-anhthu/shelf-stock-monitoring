@@ -127,3 +127,32 @@ Kiến trúc bảng SQL này cho phép migrate sang Postgres/Supabase sau này n
 - Số lượng: 2-3 ảnh/SKU, theo đúng tỷ lệ đã dùng ở benchmark Phase 2 (RPC: 48 ảnh/16 category ≈ 3 ảnh/category)
 - Tiêu chuẩn ảnh: 1 sản phẩm/ảnh, nền đơn giản, đủ sáng, thẳng mặt trước, nhãn đọc rõ — giống ảnh sản phẩm e-commerce, khác với ảnh chụp cả mảng kệ dùng lúc scan thật
 - Thông tin cần thu thập mỗi SKU: tên nội bộ (tự đặt, không cần khớp cách hiển thị của bất kỳ siêu thị thật nào), giá tham khảo, ngưỡng đầy kệ (số lượng tự định nghĩa), 2-3 ảnh mẫu
+
+> Lưu ý 2026-07-29: catalog hiện đã lên ~140 SKU (con số "~100 SKU" ở mục 2 chưa được cập nhật lại — cần thống nhất số thật trước khi sửa, chưa sửa trong lần cập nhật này).
+
+## 9. Evaluation — Classification Phase (Định nghĩa Done)
+
+Phạm vi: đánh giá riêng phase classify (SigLIP2 zero-shot retrieval trên catalog + Gemini escalation cho case `unknown`). Detection (SKU-110k model) đã frozen, không nằm trong phạm vi đánh giá này — quy trình chi tiết xem plan riêng `docs/superpowers/plans/2026-07-29-classification-eval.md`.
+
+**Test set:**
+- ~45-50 ảnh mảng kệ thật, đa dạng ánh sáng/góc/loại kệ
+- ~80-85% ảnh chứa sản phẩm nằm trong catalog hiện có; ~15-20% ảnh cố ý chứa sản phẩm KHÔNG có trong catalog (test khả năng nhận biết "unknown" thay vì match nhầm)
+- Từ crop sinh ra bởi detection, random subsample ~7-8 crop/ảnh → tổng ~300-400 crop label tay (không label hết mọi crop trong ảnh — không cần thiết cho độ chính xác thống kê ở quy mô MVP)
+- Label qua Roboflow, project loại Single-Label Classification (không phải Object Detection)
+
+**Metrics (tách riêng theo lớp, không gộp thành 1 con số accuracy tổng):**
+- SigLIP2 top-1 accuracy trên crop hợp lệ, sản phẩm có trong catalog
+- Escalation rate (% crop bị đẩy lên Gemini)
+- Gemini accuracy trên phần đã escalate
+- End-to-end classification accuracy (SigLIP2 đúng trực tiếp + Gemini đúng khi escalate)
+- **Silent wrong-match rate** trên nhóm sản phẩm ngoài catalog — % bị gán nhầm thành 1 SKU có sẵn thay vì đúng ra phải trả `unknown`/escalate. Đây là failure mode nguy hiểm nhất (báo sai out-of-stock một cách "tự tin"), phải theo dõi riêng, không được pha vào accuracy chung.
+- Crop lỗi do detection (merge nhiều SKU trong 1 box, hoặc detect nhầm vùng ngoài kệ) — loại khỏi mẫu số accuracy classification, chỉ report riêng tần suất xuất hiện (đây là lỗi của phase detection đã frozen, không phải lỗi classification)
+- Latency: trung bình + **p95** toàn pipeline (detect → SigLIP2 match → Gemini escalation nếu có) mỗi lần scan
+
+**Definition of Done (MVP) — TBD, cần em set số cụ thể trước khi chạy eval:**
+- [ ] End-to-end classification accuracy ≥ ___%
+- [ ] Silent wrong-match rate ≤ ___%
+- [ ] p95 latency ≤ 1 phút (ngân sách đã thống nhất 2026-07-29)
+- [ ] Escalation rate nằm trong ngân sách cost chấp nhận được (cost/lần gọi Gemini 3.5 Flash-Lite hiện đã xác nhận rẻ, chưa phải ràng buộc chặt)
+
+Đạt đủ các ngưỡng trên → dừng tune, coi classification phase production-ready cho MVP, chuyển sang thu thập feedback thật từ production thay vì tiếp tục tối ưu trên test set nội bộ.
