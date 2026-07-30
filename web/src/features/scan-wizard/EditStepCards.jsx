@@ -3,13 +3,19 @@ import Card from '../../shared/ui/Card.jsx';
 
 const currency = (n) => n.toLocaleString('vi-VN') + ' đ';
 
-export default function EditStepCards({ quantities, onQuantityChange, onRemoveRow }) {
+export default function EditStepCards({ quantities, onQuantityChange, onRemoveRow, hoveredSkuId, onRowHover }) {
   return (
     <div className="space-y-3 md:hidden">
       {quantities.map((q, index) => {
         const depth = q.depth ?? 1;
+        const isHovered = hoveredSkuId === q.sku_id;
         return (
-          <Card key={`${q.sku_id}-${index}`}>
+          <Card
+            key={`${q.sku_id}-${index}`}
+            onMouseEnter={() => onRowHover(q.sku_id)}
+            onMouseLeave={() => onRowHover(null)}
+            className={isHovered ? 'border-ink bg-page' : ''}
+          >
             <div className="flex items-start justify-between gap-2">
               <div>
                 <p className="font-heading text-sm font-medium text-ink">{q.sku_name}</p>

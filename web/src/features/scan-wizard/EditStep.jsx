@@ -2,14 +2,25 @@ import { useState } from 'react';
 import { computeTotalValue, isDuplicateSku } from './quantities.js';
 import EditStepTable from './EditStepTable.jsx';
 import EditStepCards from './EditStepCards.jsx';
+import BboxOverlay from './BboxOverlay.jsx';
 import Button from '../../shared/ui/Button.jsx';
 
 function isValidQuantity(value) {
   return Number.isInteger(value) && value >= 0;
 }
 
-export default function EditStep({ quantities, setQuantities, catalog, boxes, onNext }) {
+export default function EditStep({
+  quantities,
+  setQuantities,
+  catalog,
+  boxes,
+  imageUrl,
+  imageWidth,
+  imageHeight,
+  onNext,
+}) {
   const [newSkuId, setNewSkuId] = useState('');
+  const [hoveredSkuId, setHoveredSkuId] = useState(null);
 
   const totalValue = computeTotalValue(quantities);
   const availableToAdd = catalog.filter((item) => !isDuplicateSku(quantities, item.sku_id));
@@ -76,18 +87,35 @@ export default function EditStep({ quantities, setQuantities, catalog, boxes, on
     <div className="space-y-4 pb-32 md:pb-4">
       <h2 className="font-heading text-lg font-semibold text-ink">3. Kiểm tra & sửa số lượng</h2>
 
-      <EditStepTable
-        quantities={quantities}
-        catalog={catalog}
-        onQuantityChange={handleQuantityChange}
-        onSkuChange={handleSkuChange}
-        onRemoveRow={handleRemoveRow}
-      />
-      <EditStepCards
-        quantities={quantities}
-        onQuantityChange={handleQuantityChange}
-        onRemoveRow={handleRemoveRow}
-      />
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <BboxOverlay
+          imageUrl={imageUrl}
+          imageWidth={imageWidth}
+          imageHeight={imageHeight}
+          boxes={boxes}
+          quantities={quantities}
+          hoveredSkuId={hoveredSkuId}
+          onHoverSku={setHoveredSkuId}
+        />
+        <div>
+          <EditStepTable
+            quantities={quantities}
+            catalog={catalog}
+            onQuantityChange={handleQuantityChange}
+            onSkuChange={handleSkuChange}
+            onRemoveRow={handleRemoveRow}
+            hoveredSkuId={hoveredSkuId}
+            onRowHover={setHoveredSkuId}
+          />
+          <EditStepCards
+            quantities={quantities}
+            onQuantityChange={handleQuantityChange}
+            onRemoveRow={handleRemoveRow}
+            hoveredSkuId={hoveredSkuId}
+            onRowHover={setHoveredSkuId}
+          />
+        </div>
+      </div>
 
       <div className="flex items-center gap-2">
         <select

@@ -3,7 +3,15 @@ import StatusChip from '../../shared/ui/StatusChip.jsx';
 
 const currency = (n) => n.toLocaleString('vi-VN') + ' đ';
 
-export default function EditStepTable({ quantities, catalog, onQuantityChange, onSkuChange, onRemoveRow }) {
+export default function EditStepTable({
+  quantities,
+  catalog,
+  onQuantityChange,
+  onSkuChange,
+  onRemoveRow,
+  hoveredSkuId,
+  onRowHover,
+}) {
   return (
     <table className="hidden w-full border-collapse text-sm md:table">
       <thead>
@@ -25,7 +33,12 @@ export default function EditStepTable({ quantities, catalog, onQuantityChange, o
           );
           const depth = q.depth ?? 1;
           return (
-            <tr key={`${q.sku_id}-${index}`} className="border-b border-card-border">
+            <tr
+              key={`${q.sku_id}-${index}`}
+              onMouseEnter={() => onRowHover(q.sku_id)}
+              onMouseLeave={() => onRowHover(null)}
+              className={`border-b border-card-border ${hoveredSkuId === q.sku_id ? 'bg-page' : ''}`}
+            >
               <td className="py-2 font-heading font-medium text-ink">{q.sku_name}</td>
               <td>
                 <select
