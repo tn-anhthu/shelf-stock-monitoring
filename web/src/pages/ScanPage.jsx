@@ -6,6 +6,7 @@ import ConfirmStep from '../features/scan-wizard/ConfirmStep.jsx';
 import StepIndicator from '../features/scan-wizard/StepIndicator.jsx';
 import { analyzeImage, confirmScan, fetchCatalog } from '../features/scan-wizard/api.js';
 import { computeTotalValue } from '../features/scan-wizard/quantities.js';
+import { useObjectUrl } from '../shared/useObjectUrl.js';
 
 const STEPS = ['upload', 'crop', 'edit', 'confirm'];
 
@@ -14,6 +15,7 @@ export default function ScanPage() {
   const [storeId, setStoreId] = useState('');
   const [shelfId, setShelfId] = useState('');
   const [originalFile, setOriginalFile] = useState(null);
+  const [croppedImageBlob, setCroppedImageBlob] = useState(null);
   const [analyzeResult, setAnalyzeResult] = useState(null);
   const [quantities, setQuantities] = useState([]);
   const [catalog, setCatalog] = useState([]);
@@ -22,6 +24,8 @@ export default function ScanPage() {
   const [confirming, setConfirming] = useState(false);
   const [confirmError, setConfirmError] = useState(null);
   const [confirmed, setConfirmed] = useState(false);
+
+  const croppedImageUrl = useObjectUrl(croppedImageBlob);
 
   useEffect(() => {
     fetchCatalog().then(setCatalog).catch(() => setCatalog([]));
@@ -50,6 +54,7 @@ export default function ScanPage() {
         return;
       }
       setAnalyzeResult(result);
+      setCroppedImageBlob(croppedBlob);
       setQuantities(result.quantities.map((q) => ({ ...q })));
       setStep('edit');
     } catch (err) {
@@ -83,6 +88,7 @@ export default function ScanPage() {
     setStoreId('');
     setShelfId('');
     setOriginalFile(null);
+    setCroppedImageBlob(null);
     setAnalyzeResult(null);
     setQuantities([]);
     setAnalyzeError(null);
@@ -108,6 +114,9 @@ export default function ScanPage() {
           setQuantities={setQuantities}
           catalog={catalog}
           boxes={analyzeResult?.boxes ?? []}
+          imageUrl={croppedImageUrl}
+          imageWidth={analyzeResult?.image?.width ?? 0}
+          imageHeight={analyzeResult?.image?.height ?? 0}
           onNext={() => setStep('confirm')}
         />
       )}
