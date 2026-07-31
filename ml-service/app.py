@@ -1,88 +1,82 @@
-"""Thin FastAPI wrapper exposing POST /predict.
+"""FastAPI wrapper exposing POST /predict, backed by the real CV pipeline.
 
 Schema: docs/adr/0002-analyze-endpoint-schema.md
 
-Currently returns fixed mock boxes regardless of image content — the CV
-pipeline (src/pipeline/scan.py) is not wired in yet (see ADR-001). Image
-width/height are read from the real upload since that's not "mock" logic,
-just image inspection.
+Models are loaded once at startup (module level) — NOT per request, since
+loading YOLO + SigLIP2 takes real time and doing it per-request would make
+every /analyze call from the frontend unusably slow.
 """
-
 import io
+import os
+from pathlib import Path
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, File, UploadFile
+from google import genai
 from PIL import Image
+
+from mapping import map_scan_result_to_response
+from src.catalog.db import get_connection, list_catalog
+from src.classification.benchmark.embed_siglip2 import embed_image_siglip2, load_model_siglip2
+from src.detection.train.run_trained_1a import detect_1a, load_model_1a
+from src.pipeline.classify import load_catalog_embeddings
+from src.pipeline.scan import run_scan
+
+load_dotenv()
+
+REPO_ROOT = Path(__file__).resolve().parent.parent
+WEIGHTS_PATH = REPO_ROOT / "runs/detect/runs/train_1a/full/weights/best.pt"
+DB_PATH = REPO_ROOT / "data/shelfsense.db"
+IMAGES_DIR = REPO_ROOT / "data/catalog/images"
 
 app = FastAPI(title="shelf-stock-monitoring ml-service")
 
-# NOTE: these mock bbox pixel coordinates are NOT scaled to the real uploaded
-# image's width/height (returned separately via img.size below), so on real
-# (non-mock-sized) photos the boxes will visually misalign / cluster in a
-# corner. This is expected and will self-resolve once real CV integration
-# replaces this mock and returns boxes already scaled to the actual image.
-_MOCK_BOXES = [
-    {
-        "box_id": "b1",
-        "bbox": [40, 40, 220, 420],
-        "type": "product",
-        "sku_id": "choco_pie_org",
-        "sku_name": "Bánh chocopie Orion hộp 217.8g (6 cái)",
-        "confidence": 0.94,
-        "is_unknown": False,
-    },
-    {
-        "box_id": "b2",
-        "bbox": [230, 40, 410, 420],
-        "type": "product",
-        "sku_id": "choco_pie_org",
-        "sku_name": "Bánh chocopie Orion hộp 217.8g (6 cái)",
-        "confidence": 0.91,
-        "is_unknown": False,
-    },
-    {
-        "box_id": "b3",
-        "bbox": [420, 40, 600, 420],
-        "type": "product",
-        "sku_id": "karo_org",
-        "sku_name": "Bánh trứng tươi chà bông Karo Richy túi 156g",
-        "confidence": 0.89,
-        "is_unknown": False,
-    },
-    {
-        "box_id": "b4",
-        "bbox": [610, 40, 790, 420],
-        "type": "product",
-        "sku_id": None,
-        "sku_name": None,
-        "confidence": 0.52,
-        "is_unknown": True,
-    },
-    {
-        "box_id": "b5",
-        "bbox": [800, 40, 980, 420],
-        "type": "gap",
-        "sku_id": None,
-        "sku_name": None,
-        "confidence": 0.0,
-        "is_unknown": False,
-    },
-]
+# --- Loaded once at import time (module load = FastAPI process startup) ---
+_yolo_model = load_model_1a(WEIGHTS_PATH)
+_siglip_model, _siglip_processor = load_model_siglip2()
 
-_MOCK_WARNINGS = {
-    "low_confidence_regions": ["b4"],
-    "edge_crop_regions": [],
-    "blur_detected": False,
-}
+_conn = get_connection(str(DB_PATH))
+_catalog_items = list_catalog(_conn)
+_catalog_embeddings = load_catalog_embeddings(_catalog_items)
+
+if os.environ.get("LLM_PROVIDER", "anthropic") != "gemini":
+    raise RuntimeError(
+        "ml-service currently only supports LLM_PROVIDER=gemini (see .env) — "
+        "add an anthropic branch here if that changes."
+    )
+if not os.environ.get("GEMINI_API_KEY"):
+    raise RuntimeError("GEMINI_API_KEY not set in .env")
+_llm_client = genai.Client(api_key=os.environ["GEMINI_API_KEY"])
+
+
+def _detect_fn(image):
+    return detect_1a(_yolo_model, image)
+
+
+def _embed_fn(cropped_image):
+    return embed_image_siglip2(_siglip_model, _siglip_processor, cropped_image)
 
 
 @app.post("/predict")
 async def predict(image: UploadFile = File(...)):
     contents = await image.read()
     with Image.open(io.BytesIO(contents)) as img:
+        img.load()
         width, height = img.size
 
-    return {
-        "image": {"width": width, "height": height},
-        "boxes": _MOCK_BOXES,
-        "warnings": _MOCK_WARNINGS,
-    }
+        scan_result = run_scan(
+            image=img,
+            catalog_items=_catalog_items,
+            catalog_embeddings=_catalog_embeddings,
+            detect_fn=_detect_fn,
+            embed_fn=_embed_fn,
+            llm_client=_llm_client,
+            images_dir=str(IMAGES_DIR),
+        )
+
+    return map_scan_result_to_response(
+        scan_result,
+        catalog_items=_catalog_items,
+        image_width=width,
+        image_height=height,
+    )
