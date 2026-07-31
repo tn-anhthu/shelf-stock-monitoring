@@ -1,5 +1,6 @@
 from src.detection.benchmark.metrics import (
     compute_iou,
+    containment_ratio,
     match_boxes,
     compute_precision_recall,
     aggregate_precision_recall,
@@ -22,6 +23,27 @@ def test_compute_iou_partial_overlap():
     box_b = (5.0, 0.0, 15.0, 10.0)
     # intersection = 5 x 10 = 50, union = 100 + 100 - 50 = 150
     assert compute_iou(box_a, box_b) == 50.0 / 150.0
+
+
+def test_containment_ratio_smaller_box_fully_inside_larger_returns_one():
+    small = (2.0, 2.0, 8.0, 8.0)
+    large = (0.0, 0.0, 20.0, 20.0)
+    assert containment_ratio(small, large) == 1.0
+
+
+def test_containment_ratio_no_overlap_returns_zero():
+    box_a = (0.0, 0.0, 10.0, 10.0)
+    box_b = (20.0, 20.0, 30.0, 30.0)
+    assert containment_ratio(box_a, box_b) == 0.0
+
+
+def test_containment_ratio_real_haohao_pair_is_high_despite_moderate_iou():
+    # box41 (top cup only) swallowed by box45 (both cups) - real coords from
+    # scripts/debug_duplicate_boxes.py.
+    box41 = (1109.0, 2840.4, 1326.8, 3116.4)
+    box45 = (1116.5, 2843.7, 1326.5, 3254.9)
+    assert containment_ratio(box41, box45) > 0.9
+    assert compute_iou(box41, box45) < 0.7
 
 
 def test_match_boxes_all_predictions_match_ground_truth():
