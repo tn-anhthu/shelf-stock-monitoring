@@ -29,6 +29,13 @@ WEIGHTS_PATH = REPO_ROOT / "runs/detect/runs/train_1a/full/weights/best.pt"
 DB_PATH = REPO_ROOT / "data/shelfsense.db"
 IMAGES_DIR = REPO_ROOT / "data/catalog/images"
 
+# The catalog DB stores embedding_path as a plain relative string
+# (e.g. "data/catalog/embeddings/choco_pie_org.npy"), resolved relative to
+# cwd by src/pipeline/classify.py::load_catalog_embeddings. chdir here so
+# that resolves correctly regardless of which directory this process is
+# launched from (ml-service/ per the usual `cd ml-service && uvicorn ...`).
+os.chdir(REPO_ROOT)
+
 app = FastAPI(title="shelf-stock-monitoring ml-service")
 
 # --- Loaded once at import time (module load = FastAPI process startup) ---
