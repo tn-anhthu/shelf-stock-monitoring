@@ -94,6 +94,25 @@ def test_run_scan_produces_quantities_value_and_flags():
     assert len(result["detections"]) == 2
 
 
+def test_run_scan_includes_boxes_aligned_with_detections():
+    catalog_items = [
+        {"sku_id": "choco_pie_orion", "name": "Chocopie", "price": 45000, "shelf_full_qty": 10},
+    ]
+    catalog_embeddings = [("choco_pie_orion", np.array([1.0, 0.0]))]
+
+    result = run_scan(
+        image=FAKE_IMAGE,
+        catalog_items=catalog_items,
+        catalog_embeddings=catalog_embeddings,
+        detect_fn=fake_detect_fn,
+        embed_fn=fake_embed_fn,
+        llm_client=FakeLLMClient(answer="choco_pie_orion"),
+    )
+
+    assert result["boxes"] == [(0, 0, 10, 10), (10, 0, 20, 10)]
+    assert len(result["boxes"]) == len(result["detections"])
+
+
 def test_run_scan_applies_depth_multiplier_by_box_index():
     catalog_items = [{"sku_id": "choco_pie_orion", "name": "Chocopie", "price": 45000, "shelf_full_qty": 10}]
     catalog_embeddings = [("choco_pie_orion", np.array([1.0, 0.0]))]

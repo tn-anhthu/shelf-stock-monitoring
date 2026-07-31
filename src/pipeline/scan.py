@@ -112,6 +112,7 @@ def run_scan(
     }
 
     return {
+        "boxes": boxes,
         "detections": detections,
         "low_confidence": low_confidence,
         "quantities": quantities,
