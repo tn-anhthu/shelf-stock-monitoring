@@ -9,10 +9,12 @@ persist_scan() (called after the employee confirms in the UI) writes to
 inventory — run_scan() itself never writes to the database.
 """
 import json
+import statistics
 from datetime import datetime, timezone
 from typing import Callable, Dict, List, Optional, Tuple
 
 from src.catalog.db import insert_inventory_records, insert_scan_history
+from src.detection.benchmark.metrics import Box
 from src.pipeline.aggregate import aggregate_quantities, compute_value, flag_status
 from src.pipeline.box_filter import filter_anomalous_boxes, filter_contained_boxes
 from src.pipeline.box_merge import merge_adjacent_fragments
@@ -22,6 +24,32 @@ from src.pipeline.crop import crop_box
 from src.pipeline.gap_detection import detect_gaps
 
 CONFIDENCE_THRESHOLD = 0.5
+
+# Calibrated 2026-08-04 via scripts/calibrate_adaptive_tolerances.py against
+# the 5 raw (uncropped) test images — see
+# docs/superpowers/specs/2026-08-04-adaptive-box-tolerance-design.md.
+ROW_CLUSTER_TOLERANCE_RATIO = 0.051246
+Y_GAP_TOLERANCE_RATIO = 0.012812
+
+
+def adaptive_tolerances(boxes: List[Box]) -> Tuple[float, float]:
+    """Return (row_cluster_tolerance, y_gap_tolerance) scaled to the median
+    detected-box height in this image, instead of a hardcoded absolute pixel
+    value — so results don't degrade when the input image's resolution
+    changes (e.g. the UI's manual CropStep). Falls back to the historical
+    absolute values (20.0, 5.0) when fewer than 2 boxes are detected: there's
+    no meaningful median to compute, and every caller of these tolerances
+    already skips the comparison entirely when len(boxes) < 2, so the
+    fallback value here is never actually exercised — it only keeps the
+    return type consistent.
+    """
+    if len(boxes) < 2:
+        return 20.0, 5.0
+    median_height = statistics.median(b[3] - b[1] for b in boxes)
+    return (
+        ROW_CLUSTER_TOLERANCE_RATIO * median_height,
+        Y_GAP_TOLERANCE_RATIO * median_height,
+    )
 
 
 def run_scan(
@@ -56,10 +84,11 @@ def run_scan(
         roi_crop_bbox = roi_result.bbox
 
     boxes = detect_fn(image)
-    boxes = merge_adjacent_fragments(boxes)
-    boxes = filter_anomalous_boxes(boxes)
+    row_cluster_tolerance, y_gap_tolerance = adaptive_tolerances(boxes)
+    boxes = merge_adjacent_fragments(boxes, y_gap_tolerance=y_gap_tolerance)
+    boxes = filter_anomalous_boxes(boxes, row_cluster_tolerance=row_cluster_tolerance)
     boxes, flagged_regions = filter_contained_boxes(boxes)
-    gaps = detect_gaps(boxes)
+    gaps = detect_gaps(boxes, row_cluster_tolerance=row_cluster_tolerance)
 
     # Phase 1 (sequential): crop + embed + cosine-rank candidates per box.
     # Stays sequential because embed_fn shares the SigLIP2 model/GPU across
