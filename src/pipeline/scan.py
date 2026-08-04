@@ -26,36 +26,67 @@ from src.pipeline.gap_detection import detect_gaps
 CONFIDENCE_THRESHOLD = 0.5
 
 # Calibrated 2026-08-04 via scripts/calibrate_adaptive_tolerances.py against
-# the 5 raw (uncropped) test images — see
-# docs/superpowers/specs/2026-08-04-adaptive-box-tolerance-design.md.
-# Includes a 0.87 safety margin below the raw pooled-median ratio (0.051246):
-# on test3, the raw ratio pushed row_cluster_tolerance to 23.10px, flipping
-# cluster_rows' row grouping (the flip happens between 21.0px, still safe, and
-# 21.5px) and producing a phantom gap spanning almost the entire Yakult shelf
-# row. A first fix (0.88 margin) landed at 20.33px — only 0.67px/3.2% below
-# the 21.0px safe bound, too tight relative to normal detector jitter. This
-# margin instead lands at ~20.10px at test3's scale: close to the original
-# 20.0px hardcoded value (known safe across all 5 calibration images), with
-# ~0.9px/4.3% headroom below the 21.0px danger zone.
-ROW_CLUSTER_TOLERANCE_RATIO = 0.044584
-# Includes a 0.67 safety margin below the raw pooled-median ratio (0.012812):
-# on test3, the raw ratio pushed y_gap_tolerance to 5.78px, crossing the real
-# ~5.1px gap between two separate stacked Yakult 5-packs and wrongly merging
-# them into one unclassifiable box. A first fix (0.85 margin) landed at
-# 4.91px — only 0.19px/3.7% below that 5.1px ceiling, too tight. The only
-# evidence-backed lower bound on this tolerance is the real fragment case in
+# runs/detect/runs/train_1a/n_2000/weights/best.pt — the official checkpoint
+# per docs/detection-notes/detection-log.md's "Quyết định cuối cùng" — on the
+# 5 raw (uncropped) test images. See
+# docs/superpowers/specs/2026-08-04-adaptive-box-tolerance-design.md for the
+# original design (that doc still shows numbers from the first calibration
+# run, see next paragraph — treat this comment as current, that doc as
+# historical).
+#
+# An earlier version of these two constants (0.044584 / 0.008584) was
+# calibrated against runs/detect/runs/train_1a/full/weights/best.pt by
+# mistake — the same checkpoint mix-up that had ml-service/app.py's
+# WEIGHTS_PATH pointing at `full` instead of `n_2000` (both fixed together,
+# 2026-08-04). Because these ratios scale with *this checkpoint's* detected
+# box heights, a safety margin measured against one checkpoint's box
+# positions doesn't transfer to another: n_2000 detects test3's boxes at a
+# meaningfully different scale (519.9px median height vs full's ~450.9px),
+# so the danger-zone numbers below had to be re-measured from scratch
+# against real n_2000 detections, not just re-derived from the old ones.
+#
+# Includes a 0.87 safety margin below the raw pooled-median ratio (0.051799,
+# pooled_median=386.1px across all 5 images). At test3's n_2000 scale
+# (519.9px median height) this lands row_cluster_tolerance at ~23.4px.
+# Verified directly against real cluster_rows() behavior (not just ratio
+# arithmetic) by sweeping tolerance 1px-120px on all 5 calibration images,
+# looking for the specific failure this margin exists to prevent: many rows
+# collapsing into one dominant row (a jump in max row size of 3+ boxes in a
+# single step), which is what produced the phantom-gap-spanning-a-shelf-row
+# bug this margin was originally written against (found on test3 with the
+# `full` checkpoint, between 21.0px-safe and 21.5px-danger). That specific
+# danger zone does not reproduce with n_2000's box positions: test3's real
+# jump is now at 74.5px (~51px above the calibrated tolerance), test1's is at
+# 24.5px (~5.6px above), and test2/test4/test5 show no such jump anywhere in
+# the swept range. (Below that: small single-box reassignments between
+# adjacent rows happen every ~0.3-2px more or less regardless of tolerance
+# choice — inherent to continuous, closely-spaced box gaps across 40-95
+# boxes per image, not a sign of approaching danger. Distance to the
+# *nearest* flip of any kind is not a meaningful safety metric here; distance
+# to the nearest *severe* one is.)
+ROW_CLUSTER_TOLERANCE_RATIO = 0.045065
+# Includes a 0.67 safety margin below the raw pooled-median ratio (0.012950).
+# At test3's n_2000 scale this lands y_gap_tolerance at ~4.51px. Re-verified
+# the same way as ROW_CLUSTER_TOLERANCE_RATIO above, but against real
+# merge_adjacent_fragments() output: swept tolerance 0.5px-150px on all 5
+# images looking for the first real fragment-merge event (the failure mode
+# this tolerance guards against — see historical note below). With n_2000's
+# box positions, test3's first merge is at 38.3px (~33.8px above the
+# calibrated tolerance); the tightest across all 5 images is test2 at 6.5px
+# (~3.5px above). All comfortably clear.
+#
+# (Historical note: the original tuning — done against the `full` checkpoint
+# — found this same test3 photo had a real ~5.1px gap between two separate,
+# correctly-classified stacked Yakult 5-packs, at risk of being wrongly
+# merged, and iterated the margin factor specifically to stay clear of that
+# value. That measurement was tied to `full`'s box positions and hasn't been
+# re-verified against n_2000's; the merge-event sweep above (which found no
+# merge until 38.3px) is the up-to-date safety check. The other historical
+# floor still holds regardless of checkpoint: the real fragment case in
 # tests/pipeline/test_box_merge.py::test_merge_adjacent_fragments_merges_real_measured_split_case
-# (measured y_gap=-1.7, i.e. the fragments actually overlap in y) — so there's
-# no meaningful floor pushing this ratio up, and much more room to lower it.
-# (An earlier version of this comment cited a "~2.6px margin" from
-# docs/reports/week-02/2026-07-30.md as this tolerance's evidence — that was
-# a misread: that report describes a *different*, abandoned experiment that
-# tried a new y_gap_tolerance, measured only 2.6px of margin, judged it
-# unsafe, and left the threshold unchanged/backlogged. It was never bridged
-# by this tolerance.) This margin lands at ~3.87px at test3's scale: clear of
-# the 5.1px ceiling by ~1.23px/24%, still well above the -1.7px floor so
-# genuine fragment-merge cases elsewhere keep working.
-Y_GAP_TOLERANCE_RATIO = 0.008584
+# measured y_gap=-1.7, i.e. the fragments actually overlap in y — so there's
+# no meaningful floor pushing this ratio up.)
+Y_GAP_TOLERANCE_RATIO = 0.008676
 
 
 def adaptive_tolerances(boxes: List[Box]) -> Tuple[float, float]:
