@@ -64,6 +64,49 @@ Cả precision và recall đều tăng, không đánh đổi — chỉ cần th�
 
 **Cải tiến kèm theo:** `src/detection/train/data.py` được sửa để bỏ qua tải lại ảnh đã có sẵn trên đĩa — các lần thử nghiệm tiếp theo với cùng `n_train`/`n_val` sẽ không tốn lại ~20-30 phút tải mạng.
 
+## 04/08/2026 — Backlog: `cluster_rows` chain theo y-center, không theo row average — CHƯA FIX
+
+Trong lúc audit checkpoint bug (`full` → `n_2000`, xem phần đầu file) và recalibrate lại
+`ROW_CLUSTER_TOLERANCE_RATIO`/`Y_GAP_TOLERANCE_RATIO` trong `src/pipeline/scan.py`, xác nhận
+lại 1 nghi vấn đã gặp nhiều lần nhưng chưa bao giờ được ghi thành issue riêng — 3 case cụ thể:
+
+1. **Hảo Hảo crop (test1, đầu phiên brainstorm 04/08)** — test qua UI (crop tay qua
+   `CropStep.jsx`) cho kết quả tệ hẳn so với script raw: 1 box bao trọn 2 hộp Hảo Hảo đỏ cạnh
+   nhau đáng lẽ phải tách riêng (xem `docs/superpowers/specs/2026-08-04-adaptive-box-tolerance-design.md`
+   mục 1). `filter_anomalous_boxes` (dùng chung `cluster_rows`) là nghi phạm.
+2. **Yakult test3 cũ (checkpoint `full`)** — `row_cluster_tolerance` vượt 21.0-21.5px làm
+   `cluster_rows` gộp gần hết 1 hàng kệ Yakult thành 1 nhóm, tạo gap ảo trải gần hết hàng (lý
+   do ban đầu khiến `ROW_CLUSTER_TOLERANCE_RATIO` phải giữ safety margin chặt — xem lịch sử
+   comment cũ trong `src/pipeline/scan.py` trước lần sửa hôm nay).
+3. **2 gap test3 hôm nay (checkpoint `n_2000`, sau khi recalibrate)** — trace bằng
+   `scripts/debug_stage_trace.py` cho cả 2 vùng gap: box bị flag NEEDS REVIEW đều là raw YOLO
+   detection nguyên vẹn (IoU=1.000 với raw), không phải do `merge_adjacent_fragments` tạo ra —
+   đều là chai cao bất thường (h≈727-793px so với median ảnh ~520px) nằm ở ranh giới 2 hàng.
+
+**Root cause (đã đọc code xác nhận, không chỉ suy đoán):** `src/pipeline/row_clustering.py::cluster_rows`
+so sánh box mới với y-center của **box cuối cùng vừa được thêm vào hàng** (`rows[-1][-1]`),
+không phải với y-center trung bình của cả hàng:
+
+```python
+if rows and box_y_center(box) - box_y_center(rows[-1][-1]) <= tolerance:
+    rows[-1].append(box)
+```
+
+Đây là hiệu ứng "chaining" kinh điển (giống single-linkage clustering): 1 hàng có thể trôi xa
+tuỳ ý so với điểm bắt đầu, miễn mỗi box kế tiếp nằm trong `tolerance` so với box *ngay trước
+nó* — không so với cả hàng. Một chuỗi box (vd. chai cao bắc cầu giữa 2 hàng kệ thật) có thể lần
+lượt thoả điều kiện tolerance từng cặp một, trong khi cả hàng gộp lại đã trải rộng hơn 1 hàng
+kệ vật lý thật nhiều.
+
+**Trạng thái: CHƯA FIX.** Cố tình không gộp vào lần recalibrate tolerance hôm nay — đây là lỗi
+thuật toán (chain theo điểm liền kề thay vì trung bình/centroid cả cụm), không phải lỗi chọn
+sai giá trị tolerance, nên sửa tolerance không giải quyết được gốc rễ. Cần brainstorm riêng
+hướng sửa (vd. so với y-center trung bình của cả hàng thay vì box cuối, hoặc đổi sang thuật
+toán clustering khác) trước khi động vào `cluster_rows`, vì hàm này được `gap_detection.py`,
+`box_filter.py` (2 hàm) dùng chung — sửa sai có thể ảnh hưởng dây chuyền. Ghi lại ở đây theo
+đúng kỷ luật "đo trước khi quyết, ghi lại trước khi quên" đã áp dụng xuyên suốt file này, để
+không bị quên giữa các phiên làm việc.
+
 ## Bài học rút ra cho các lần sau
 
 **16GB RAM (unified memory) là giới hạn cứng của máy, xuất hiện lặp lại 2 lần** (mosaic + nhiều ảnh ngày 17/7, model lớn hơn ngày 20/7) — dấu hiệu nhận biết: tốc độ mỗi batch dao động mạnh/tăng dần bất thường (không phải chậm đều), kèm cột bộ nhớ báo gần 16G. Khi gặp dấu hiệu này, dừng ngay, không đợi hết epoch — nhiều khả năng không tự hết mà crash máy.
