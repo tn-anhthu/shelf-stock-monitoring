@@ -1,4 +1,4 @@
-# ROI-crop: center-bias + sharpness component selection — 2026-07-28c
+# ROI-crop: center-bias + sharpness component selection — 2026-07-28
 
 ## Bối cảnh
 

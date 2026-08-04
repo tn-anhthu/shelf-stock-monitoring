@@ -1,4 +1,4 @@
-# NMS iou tuning cho case "nhiều box IoU cao trên 1 vật" — 2026-07-28d
+# NMS iou tuning cho case "nhiều box IoU cao trên 1 vật" — 2026-07-28
 
 ## Bối cảnh đối chiếu
 

@@ -59,7 +59,7 @@ Nối `ml-service` thật vào `api` sau khi backend CV ổn định hơn.
 - Scope MVP không đổi: vẫn 1 luồng chính (upload ảnh → trả kết quả), không thêm feature
   mới ngoài việc đổi tầng kiến trúc nội bộ.
 
-## Cấu trúc thư mục (bổ sung 2026-07-28d)
+## Cấu trúc thư mục (bổ sung 2026-07-28)
 
 `ml-service/` là wrapper MỎNG, KHÔNG di chuyển `src/`, `scripts/`, `tests/` hiện có — giữ đúng
 tinh thần "ml-service giữ nguyên 100% model logic, không sửa" ở mục Decision. Cụ thể:

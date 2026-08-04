@@ -3,14 +3,14 @@ background that sit entirely inside the frame (docs/specs/mvp-design.md section 
 "ROI-Crop Preprocessing"). Uses CLIPSeg (no training) to score "keep" prompts
 (product, shelf) vs. "exclude" prompts (floor, ceiling, person) per pixel, lists
 every connected component of (keep AND NOT exclude) above a minimum size, scores
-each by center-bias + sharpness (2026-07-28c, see DEFAULT_COMPONENT_WEIGHTS), and
+each by center-bias + sharpness (2026-07-28, see DEFAULT_COMPONENT_WEIGHTS), and
 crops to the winner's bounding box.
 
 Mirrors the paper referenced in that spec entry (VISAPP 2026, "Retail Shelf
 Monitoring Using Deep Hough Transform and Object Detection"):
     ROI = (product ∪ shelf) ∧ ¬(floor ∪ roof)
 
-Known limit (2026-07-28c, docs/reports/2026-07-28c-roi-crop-component-selection.md):
+Known limit (2026-07-28, docs/log-figures/2026-07-28-roi-crop-component-selection.md):
 on all 5 demo photos, at every threshold tested (0.35-0.80), the mask never
 fragments into more than 1 candidate component -- target shelf and an adjacent
 neighbor shelf fuse into a single blob whenever both sit at eye level with no
@@ -44,7 +44,7 @@ EXCLUDE_PROMPTS = ["floor", "ceiling", "person", "empty aisle background"]
 # scoring each threshold's largest-connected-component bbox by IoU against a
 # ground-truth ROI box per image (the employee's own manual crop, template-
 # matched back into the original image) -- see
-# docs/reports/2026-07-28-roi-crop-threshold-benchmark.md for the full sweep.
+# docs/log-figures/2026-07-28-roi-crop-threshold-benchmark.md for the full sweep.
 # 0.55 is the highest-avg-IoU threshold (0.795) with zero fallbacks across all
 # 5 images; thresholds >=0.6 score higher on some individual images but collapse
 # on the 2 most perspective-skewed photos (IoU down to 0.48-0.62) and 0.70
@@ -181,7 +181,7 @@ def laplacian_sharpness(image: Image.Image, bbox: Tuple[int, int, int, int]) -> 
 # Equal weighting (1, 1, 1) on (area, center-bias, sharpness), each min-max
 # normalized across the candidate set before combining. NOT benchmarked
 # against the 5 demo photos like DEFAULT_THRESHOLD was -- see
-# docs/reports/2026-07-28c-roi-crop-component-selection.md: every one of the 5
+# docs/log-figures/2026-07-28-roi-crop-component-selection.md: every one of the 5
 # demo images produces exactly 1 candidate component at every threshold tested
 # (0.35-0.80), so there is never more than one candidate to score/discriminate
 # between, and no real multi-component example exists in the demo set to tune

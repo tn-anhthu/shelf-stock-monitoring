@@ -1,4 +1,4 @@
-# Việc 2 — Trigger cho case đa-SKU trong 1 box (Binggrae) — CHỈ ĐO, chưa implement — 2026-07-28f
+# Việc 2 — Trigger cho case đa-SKU trong 1 box (Binggrae) — CHỈ ĐO, chưa implement — 2026-07-28
 
 ## Case đã biết
 
@@ -18,7 +18,7 @@ thẳng, không phải "case ẩn" như Binggrae — không tính vào n cho kh�
 **Xác nhận thống kê "0.34%"**: dữ liệu lấy lại từ log full-pipeline 5 ảnh demo
 (đã chạy trước, 297 box tổng — khớp đúng con số đã dùng nhiều lần trong các báo
 cáo trước) → 1/297 = 0.337% ≈ 0.34%. Không tìm thấy văn bản gốc ghi đúng số này
-trong `docs/` hiện tại (spec cũ đã bị xoá/tái cấu trúc, xem báo cáo 2026-07-28d),
+trong `docs/` hiện tại (spec cũ đã bị xoá/tái cấu trúc, xem báo cáo 2026-07-28),
 nhưng con số khớp chính xác với dữ liệu đang có — coi là xác nhận được, không
 phải bịa số.
 

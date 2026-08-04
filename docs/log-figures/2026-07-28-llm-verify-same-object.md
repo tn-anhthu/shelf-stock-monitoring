@@ -1,4 +1,4 @@
-# Việc 1 — LLM escalation cho case IoU-duplicate (đã implement + chạy thật) — 2026-07-28e
+# Việc 1 — LLM escalation cho case IoU-duplicate (đã implement + chạy thật) — 2026-07-28
 
 ## Implement
 
@@ -7,7 +7,7 @@ cho Gemini) — theo đúng convention của `escalate_to_llm` đã có (cùng s
 `{reasoning, answer}`, cùng retry-on-malformed-JSON, cùng cách build content
 Anthropic/Gemini). Câu hỏi: gửi 2 crop, hỏi model đây là 1 vật lý (`same_object`)
 hay 2 vật lý khác nhau (`different_objects`, có thể cùng SKU). Prompt nêu rõ bẫy
-đã phát hiện hôm 2026-07-28d: 2 sản phẩm cùng SKU xếp chồng/sát nhau KHÔNG được
+đã phát hiện hôm 2026-07-28: 2 sản phẩm cùng SKU xếp chồng/sát nhau KHÔNG được
 tự động coi là 1 vật chỉ vì giống hệt nhau — model phải nhìn nội dung ảnh (2 nắp,
 2 đường viền sản phẩm, đường nối/khe hở) chứ không suy luận từ độ giống bao bì.
 
@@ -18,7 +18,7 @@ llm_escalation pass.
 ## Chạy thật trên đúng 42 cặp
 
 Dùng lại `data/scan_viz/input/test{1-5}.HEIC` gốc + tọa độ 42 cặp đã đo hôm
-2026-07-28d (không mở rộng danh sách). Provider = Gemini (mặc định `.env`,
+2026-07-28 (không mở rộng danh sách). Provider = Gemini (mặc định `.env`,
 khớp cách chạy thật của dự án).
 
 ### Kết quả tổng
@@ -29,7 +29,7 @@ khớp cách chạy thật của dự án).
 | `same_object` (đề xuất merge) | 34 |
 | `different_objects` (giữ nguyên) | 8 |
 
-### Đối chiếu với 3 ground truth đã xác nhận bằng mắt (test3, session 2026-07-28d)
+### Đối chiếu với 3 ground truth đã xác nhận bằng mắt (test3, session 2026-07-28)
 
 | cặp | ground truth | LLM trả lời | đúng? |
 |---|---|---|---|

@@ -93,8 +93,8 @@ _REASONING_SCHEMA_DESCRIPTION = (
     "feature that confirms or rules out the final answer"
 )
 
-# verify_same_object: 2026-07-28e, for the 42 known high-IoU/high-containment
-# box pairs from docs/reports/2026-07-28d-nms-iou-duplicate-detection.md.
+# verify_same_object: 2026-07-28, for the 42 known high-IoU/high-containment
+# box pairs from docs/log-figures/2026-07-28-nms-iou-duplicate-detection.md.
 # Measured there: neither IoU nor containment alone can tell apart (a) one
 # physical product detected twice ("same_object", should merge) from (b) 2
 # real, separate physical units -- possibly the SAME sku_id, stacked/adjacent,
@@ -306,7 +306,7 @@ def verify_same_object(
     See _SAME_OBJECT_INSTRUCTION_TEXT for why this is a distinct question from
     escalate_to_llm's SKU match: geometric overlap (IoU/containment) can't tell
     apart "1 product detected twice" from "2 real adjacent/stacked units,
-    possibly the same SKU" -- docs/reports/2026-07-28d-nms-iou-duplicate-detection.md."""
+    possibly the same SKU" -- docs/log-figures/2026-07-28-nms-iou-duplicate-detection.md."""
     content: List[Dict] = [
         _image_block(crop_a),
         _image_block(crop_b),

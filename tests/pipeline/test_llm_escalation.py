@@ -383,8 +383,8 @@ def test_escalate_to_llm_gemini_raises_after_exhausting_retries_on_persistent_ma
     assert client.models.calls == 3
 
 
-# --- verify_same_object: 2026-07-28e, IoU-duplicate case (see
-# docs/reports/2026-07-28d-nms-iou-duplicate-detection.md) -- given 2 crops
+# --- verify_same_object: 2026-07-28, IoU-duplicate case (see
+# docs/log-figures/2026-07-28-nms-iou-duplicate-detection.md) -- given 2 crops
 # from a high-IoU/high-containment box pair, ask the LLM whether they show the
 # SAME physical product (merge) or 2 DIFFERENT physical units (keep both). ---
 

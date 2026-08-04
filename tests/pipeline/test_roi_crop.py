@@ -83,7 +83,7 @@ def test_crop_to_roi_from_mask_falls_back_when_component_too_small():
     assert result.image is image
 
 
-# --- Component-selection scoring (2026-07-28c): center-bias + sharpness, added
+# --- Component-selection scoring (2026-07-28): center-bias + sharpness, added
 # to disambiguate multiple candidate components when the mask itself doesn't
 # fuse target-shelf and neighbor-shelf into one blob (see roi_crop.py module
 # docstring for why this never actually fires on the 5 demo photos -- these
