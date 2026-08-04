@@ -28,20 +28,34 @@ CONFIDENCE_THRESHOLD = 0.5
 # Calibrated 2026-08-04 via scripts/calibrate_adaptive_tolerances.py against
 # the 5 raw (uncropped) test images — see
 # docs/superpowers/specs/2026-08-04-adaptive-box-tolerance-design.md.
-# Includes a 0.88 safety margin below the raw pooled-median ratio (0.051246):
+# Includes a 0.87 safety margin below the raw pooled-median ratio (0.051246):
 # on test3, the raw ratio pushed row_cluster_tolerance to 23.10px, flipping
 # cluster_rows' row grouping (the flip happens between 21.0px, still safe, and
 # 21.5px) and producing a phantom gap spanning almost the entire Yakult shelf
-# row. The margin keeps this comfortably below that flip point.
-ROW_CLUSTER_TOLERANCE_RATIO = 0.045097
-# Includes a 0.85 safety margin below the raw pooled-median ratio (0.012812):
+# row. A first fix (0.88 margin) landed at 20.33px — only 0.67px/3.2% below
+# the 21.0px safe bound, too tight relative to normal detector jitter. This
+# margin instead lands at ~20.10px at test3's scale: close to the original
+# 20.0px hardcoded value (known safe across all 5 calibration images), with
+# ~0.9px/4.3% headroom below the 21.0px danger zone.
+ROW_CLUSTER_TOLERANCE_RATIO = 0.044584
+# Includes a 0.67 safety margin below the raw pooled-median ratio (0.012812):
 # on test3, the raw ratio pushed y_gap_tolerance to 5.78px, crossing the real
 # ~5.1px gap between two separate stacked Yakult 5-packs and wrongly merging
-# them into one unclassifiable box. The margin keeps this below real per-image
-# gaps like that one while staying above the ~2.6px margin measured for the
-# genuine Vinamilk split-box fragment case this tolerance exists to bridge
-# (docs/reports/week-02/2026-07-30.md).
-Y_GAP_TOLERANCE_RATIO = 0.010890
+# them into one unclassifiable box. A first fix (0.85 margin) landed at
+# 4.91px — only 0.19px/3.7% below that 5.1px ceiling, too tight. The only
+# evidence-backed lower bound on this tolerance is the real fragment case in
+# tests/pipeline/test_box_merge.py::test_merge_adjacent_fragments_merges_real_measured_split_case
+# (measured y_gap=-1.7, i.e. the fragments actually overlap in y) — so there's
+# no meaningful floor pushing this ratio up, and much more room to lower it.
+# (An earlier version of this comment cited a "~2.6px margin" from
+# docs/reports/week-02/2026-07-30.md as this tolerance's evidence — that was
+# a misread: that report describes a *different*, abandoned experiment that
+# tried a new y_gap_tolerance, measured only 2.6px of margin, judged it
+# unsafe, and left the threshold unchanged/backlogged. It was never bridged
+# by this tolerance.) This margin lands at ~3.87px at test3's scale: clear of
+# the 5.1px ceiling by ~1.23px/24%, still well above the -1.7px floor so
+# genuine fragment-merge cases elsewhere keep working.
+Y_GAP_TOLERANCE_RATIO = 0.008584
 
 
 def adaptive_tolerances(boxes: List[Box]) -> Tuple[float, float]:

@@ -85,6 +85,33 @@ def test_adaptive_tolerances_falls_back_with_fewer_than_2_boxes():
     assert adaptive_tolerances([(0, 0, 100, 100)]) == (20.0, 5.0)
 
 
+def test_adaptive_tolerances_stay_below_test3_danger_thresholds():
+    # Pins the actual real-world invariants Task 4's verification discovered on
+    # test3.HEIC (median detected-box height ~450.9px), independent of the
+    # exact ROW_CLUSTER_TOLERANCE_RATIO / Y_GAP_TOLERANCE_RATIO literals -
+    # unlike test_adaptive_tolerances_scales_with_median_box_height above,
+    # which imports those same constants and would stay green even if they
+    # were changed to values that reintroduce this exact regression.
+    #
+    # row_cluster_tolerance: at test3's scale, cluster_rows' row grouping was
+    # empirically found to flip between 21.0px (still safe) and 21.5px,
+    # producing a phantom gap spanning almost the entire Yakult shelf row.
+    # y_gap_tolerance: at test3's scale, a value of 5.78px crosses the real
+    # ~5.1px gap between two separate, correctly-classified stacked Yakult
+    # 5-packs and wrongly merges them into one unclassifiable box.
+    #
+    # Boxes below are synthetic, chosen only so their median height (b[3]-b[1])
+    # is ~450.9px to match test3's real detected scale.
+    boxes = [
+        (0, 0, 100, 449.0),
+        (0, 0, 100, 450.9),
+        (0, 0, 100, 452.0),
+    ]
+    row_cluster_tolerance, y_gap_tolerance = adaptive_tolerances(boxes)
+    assert row_cluster_tolerance < 21.0
+    assert y_gap_tolerance < 5.1
+
+
 def test_run_scan_produces_quantities_value_and_flags():
     catalog_items = [
         {"sku_id": "choco_pie_orion", "name": "Chocopie", "price": 45000, "shelf_full_qty": 10},
