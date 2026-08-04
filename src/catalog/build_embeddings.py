@@ -18,11 +18,9 @@ def build_sku_embedding(image_paths: List[str], embed_fn: Callable[[Image.Image]
 
     Args:
         image_paths: List of paths to exemplar images for this SKU.
-        embed_fn: Callable that takes a PIL.Image.Image (full reference image) and returns
-            its embedding as an np.ndarray. NOTE: This is a different embed_fn contract
-            than src/pipeline/scan.py::run_scan uses — scan.py's embed_fn takes a
-            (image, box) tuple for a shelf crop. A future caller wiring the real SigLIP2
-            model into both places needs two separate adapter lambdas.
+        embed_fn: Callable that takes a PIL.Image.Image and returns its embedding as an
+            np.ndarray — same contract src/pipeline/scan.py::run_scan uses for shelf
+            crops, so both places can share one real SigLIP2 adapter.
 
     Returns:
         The mean embedding across all exemplar images.

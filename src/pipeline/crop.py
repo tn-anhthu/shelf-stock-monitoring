@@ -1,5 +1,5 @@
-"""Crop a detected box region out of the full shelf image before embedding it,
-matching the (image, box) contract src/pipeline/scan.py::run_scan expects from embed_fn.
+"""Crop a detected box region out of the full shelf image before embedding it —
+called directly by src/pipeline/scan.py::run_scan for each detected box.
 """
 from typing import Optional
 

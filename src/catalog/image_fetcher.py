@@ -2,12 +2,14 @@
 self-photographed or AI-generated per spec section 10) into
 data/catalog/images/<sku_id>/<n>.jpg.
 """
+import io
 import time
 from pathlib import Path
 from typing import Callable, List
 from urllib.parse import urlparse
 
 import requests
+from PIL import Image, UnidentifiedImageError
 
 
 def default_http_get(url: str, timeout=10, max_retries: int = 2, _get: Callable = requests.get):
@@ -43,9 +45,19 @@ def fetch_sku_images(
 
     written_paths = []
     for i, url in enumerate(image_urls, start=1):
-        response = http_get(url, timeout=10)
-        response.raise_for_status()
         dest = sku_dir / f"{i}.jpg"
+        if dest.exists():
+            written_paths.append(str(dest))
+            continue
+
+        try:
+            response = http_get(url, timeout=10)
+            response.raise_for_status()
+            Image.open(io.BytesIO(response.content)).verify()
+        except (requests.exceptions.RequestException, UnidentifiedImageError, OSError) as exc:
+            print(f"[fetch_sku_images] skipping {sku_id} image {i} ({url}): {exc}")
+            continue
+
         dest.write_bytes(response.content)
         written_paths.append(str(dest))
     return written_paths

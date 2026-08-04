@@ -69,3 +69,72 @@ def test_seed_catalog_writes_images_embedding_and_db_row(tmp_path):
     assert catalog[0]["sku_id"] == "choco_pie_orion"
     assert catalog[0]["price"] == 45000
     assert catalog[0]["embedding_path"] == str(embeddings_dir / "choco_pie_orion.npy")
+
+
+def _write_two_row_csv(path, second_row_url):
+    with open(path, "w", newline="") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=["sku_id", "name", "price", "shelf_full_qty", "image_url_1", "image_url_2", "image_url_3"],
+        )
+        writer.writeheader()
+        writer.writerow(
+            {
+                "sku_id": "choco_pie_orion",
+                "name": "Chocopie Orion hop 12 cai",
+                "price": "45000",
+                "shelf_full_qty": "10",
+                "image_url_1": "https://example.com/1.jpg",
+                "image_url_2": "",
+                "image_url_3": "",
+            }
+        )
+        writer.writerow(
+            {
+                "sku_id": "haohao_prem_bosate",
+                "name": "Mi tron Hao Hao Premium bo sa te",
+                "price": "7900",
+                "shelf_full_qty": "10",
+                "image_url_1": second_row_url,
+                "image_url_2": "",
+                "image_url_3": "",
+            }
+        )
+
+
+def test_seed_catalog_skips_sku_with_no_valid_images_and_continues(tmp_path):
+    csv_path = tmp_path / "catalog.csv"
+    _write_two_row_csv(csv_path, second_row_url="https://cooponline.vn/some-product-page")
+    images_dir = tmp_path / "images"
+    embeddings_dir = tmp_path / "embeddings"
+    db_path = tmp_path / "shelfsense.db"
+
+    from PIL import Image
+    import io
+
+    def fake_get(url, timeout=10):
+        buf = io.BytesIO()
+        Image.new("RGB", (4, 4)).save(buf, format="JPEG")
+        return FakeResponse(buf.getvalue())
+
+    def fetch_that_fails_for_product_page(url, timeout=10):
+        if "cooponline" in url:
+            return FakeResponse(b"<!DOCTYPE html>not an image</html>")
+        return fake_get(url, timeout=timeout)
+
+    count = seed_catalog(
+        csv_path=str(csv_path),
+        images_dir=str(images_dir),
+        embeddings_dir=str(embeddings_dir),
+        db_path=str(db_path),
+        embed_fn=lambda image: np.array([1.0, 0.0]),
+        http_get=fetch_that_fails_for_product_page,
+    )
+
+    assert count == 1
+
+    conn = get_connection(str(db_path))
+    catalog = list_catalog(conn)
+    assert len(catalog) == 1
+    assert catalog[0]["sku_id"] == "choco_pie_orion"
+    assert not (embeddings_dir / "haohao_prem_bosate.npy").exists()
