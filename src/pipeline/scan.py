@@ -28,8 +28,20 @@ CONFIDENCE_THRESHOLD = 0.5
 # Calibrated 2026-08-04 via scripts/calibrate_adaptive_tolerances.py against
 # the 5 raw (uncropped) test images — see
 # docs/superpowers/specs/2026-08-04-adaptive-box-tolerance-design.md.
-ROW_CLUSTER_TOLERANCE_RATIO = 0.051246
-Y_GAP_TOLERANCE_RATIO = 0.012812
+# Includes a 0.88 safety margin below the raw pooled-median ratio (0.051246):
+# on test3, the raw ratio pushed row_cluster_tolerance to 23.10px, flipping
+# cluster_rows' row grouping (the flip happens between 21.0px, still safe, and
+# 21.5px) and producing a phantom gap spanning almost the entire Yakult shelf
+# row. The margin keeps this comfortably below that flip point.
+ROW_CLUSTER_TOLERANCE_RATIO = 0.045097
+# Includes a 0.85 safety margin below the raw pooled-median ratio (0.012812):
+# on test3, the raw ratio pushed y_gap_tolerance to 5.78px, crossing the real
+# ~5.1px gap between two separate stacked Yakult 5-packs and wrongly merging
+# them into one unclassifiable box. The margin keeps this below real per-image
+# gaps like that one while staying above the ~2.6px margin measured for the
+# genuine Vinamilk split-box fragment case this tolerance exists to bridge
+# (docs/reports/week-02/2026-07-30.md).
+Y_GAP_TOLERANCE_RATIO = 0.010890
 
 
 def adaptive_tolerances(boxes: List[Box]) -> Tuple[float, float]:
