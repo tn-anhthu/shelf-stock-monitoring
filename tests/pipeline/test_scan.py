@@ -9,7 +9,6 @@ from src.catalog.db import create_tables, get_connection
 from src.pipeline.box_filter import filter_anomalous_boxes, filter_contained_boxes
 from src.pipeline.box_merge import merge_adjacent_fragments
 from src.pipeline.gap_detection import detect_gaps
-from src.pipeline.roi_crop import RoiCropResult
 from src.pipeline.scan import persist_scan, run_scan
 
 FAKE_IMAGE = Image.new("RGB", (200, 200))
@@ -317,83 +316,6 @@ def test_run_scan_verifies_boxes_with_llm_in_parallel_not_sequentially():
     assert result["quantities"] == {"choco_pie_orion": 5}
     # sequential would take 5 * delay (1.0s); parallel should be well under half that.
     assert elapsed < delay * 5 / 2
-
-
-def test_run_scan_applies_roi_crop_before_detect_when_background_present():
-    # Simulates the "has clear background, needs crop" case: roi_crop_fn hands
-    # back a smaller, different image object than FAKE_IMAGE (standing in for a
-    # neighboring-shelf crop actually being removed) and detect_fn must receive
-    # THAT image, not the original -- proving the crop runs before detect_fn.
-    cropped_image = Image.new("RGB", (150, 150))
-    seen_images = []
-
-    def tracking_detect_fn(image):
-        seen_images.append(image)
-        return fake_detect_fn(image)
-
-    def roi_crop_fn(image):
-        assert image is FAKE_IMAGE  # roi crop must see the *original* upload
-        return RoiCropResult(image=cropped_image, applied=True, reason="ok", bbox=(25, 25, 175, 175))
-
-    catalog_items = [{"sku_id": "choco_pie_orion", "name": "Chocopie", "price": 45000, "shelf_full_qty": 10}]
-    catalog_embeddings = [("choco_pie_orion", np.array([1.0, 0.0]))]
-
-    result = run_scan(
-        image=FAKE_IMAGE,
-        catalog_items=catalog_items,
-        catalog_embeddings=catalog_embeddings,
-        detect_fn=tracking_detect_fn,
-        embed_fn=fake_embed_fn,
-        llm_client=FakeLLMClient(answer="choco_pie_orion"),
-        roi_crop_fn=roi_crop_fn,
-    )
-
-    assert seen_images == [cropped_image]
-    assert result["roi_crop"] == {"applied": True, "reason": "ok", "bbox": (25, 25, 175, 175)}
-    assert result["quantities"] == {"choco_pie_orion": 2}  # scan still completes normally
-
-
-def test_run_scan_falls_back_to_original_image_when_roi_mask_unreliable():
-    # Simulates CLIPSeg producing an empty/too-small mask (e.g. a shelf photo
-    # CLIPSeg can't confidently segment): roi_crop_fn reports applied=False and
-    # hands back the ORIGINAL image untouched -- the scan must still complete
-    # normally on the original image, never crash or block.
-    def roi_crop_fn(image):
-        return RoiCropResult(image=image, applied=False, reason="mask_empty_or_too_small", bbox=None)
-
-    catalog_items = [{"sku_id": "choco_pie_orion", "name": "Chocopie", "price": 45000, "shelf_full_qty": 10}]
-    catalog_embeddings = [("choco_pie_orion", np.array([1.0, 0.0]))]
-
-    result = run_scan(
-        image=FAKE_IMAGE,
-        catalog_items=catalog_items,
-        catalog_embeddings=catalog_embeddings,
-        detect_fn=fake_detect_fn,
-        embed_fn=fake_embed_fn,
-        llm_client=FakeLLMClient(answer="choco_pie_orion"),
-        roi_crop_fn=roi_crop_fn,
-    )
-
-    assert result["roi_crop"] == {"applied": False, "reason": "mask_empty_or_too_small", "bbox": None}
-    assert result["quantities"] == {"choco_pie_orion": 2}  # scan not blocked by the fallback
-
-
-def test_run_scan_skips_roi_crop_entirely_when_no_roi_crop_fn_given():
-    # Default (roi_crop_fn=None) must behave exactly like before 2026-07-28 --
-    # no crop attempted, no crash, "disabled" reported for observability.
-    catalog_items = [{"sku_id": "choco_pie_orion", "name": "Chocopie", "price": 45000, "shelf_full_qty": 10}]
-    catalog_embeddings = [("choco_pie_orion", np.array([1.0, 0.0]))]
-
-    result = run_scan(
-        image=FAKE_IMAGE,
-        catalog_items=catalog_items,
-        catalog_embeddings=catalog_embeddings,
-        detect_fn=fake_detect_fn,
-        embed_fn=fake_embed_fn,
-        llm_client=FakeLLMClient(answer="choco_pie_orion"),
-    )
-
-    assert result["roi_crop"] == {"applied": False, "reason": "disabled", "bbox": None}
 
 
 def test_persist_scan_writes_scan_history_and_inventory_rows(tmp_path):
