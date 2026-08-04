@@ -3,6 +3,7 @@ import { Cropper } from 'react-cropper';
 import 'cropperjs/dist/cropper.css';
 import Button from '../../shared/ui/Button.jsx';
 import { useObjectUrl } from '../../shared/useObjectUrl.js';
+import AnalyzingModal from './AnalyzingModal.jsx';
 
 const CORNER_BASE = 'pointer-events-none absolute h-6 w-6 border-ink';
 
@@ -48,12 +49,11 @@ export default function CropStep({ originalFile, analyzing, analyzeError, onAnal
         <span className={`${CORNER_BASE} bottom-2 right-2 border-b-2 border-r-2`} />
       </div>
 
-      <Button type="button" onClick={handleAnalyzeClick} disabled={analyzing} className="flex items-center gap-2">
-        {analyzing && (
-          <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-        )}
-        {analyzing ? 'Đang phân tích…' : 'Phân tích'}
+      <Button type="button" onClick={handleAnalyzeClick} disabled={analyzing}>
+        Phân tích
       </Button>
+
+      <AnalyzingModal open={analyzing} />
     </div>
   );
 }
