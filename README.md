@@ -83,10 +83,10 @@ Roadmap 5 tuần (20/7 → 23/8/2026):
 
 - Dataset nặng (SKU-110K) nên stream/subset.
 - 4 virtualenv riêng do các bộ dependency ghim version đá nhau (không gộp được vào 1 file `requirements.txt` chung):
-  - `.venv-benchmark` ← `requirements.txt` (ultralytics 8.0.43, ghim để đọc được checkpoint pickle cũ)
-  - `.venv-train` ← `requirements-train.txt` (ultralytics ≥8.3, để fine-tune/evaluate)
-  - `.venv-classify` ← `requirements-classify.txt` (SigLIP2/transformers, cho `src/catalog/build_embeddings.py`)
-  - `.venv-e2e` ← `requirements-e2e.txt` (kết hợp YOLO checkpoint-compatible + SigLIP2 chạy chung 1 process, cho `scripts/run_scan_e2e.py`)
+  - `.venv-benchmark` ← `requirements/benchmark.txt` (ultralytics 8.0.43, ghim để đọc được checkpoint pickle cũ)
+  - `.venv-train` ← `requirements/train.txt` (ultralytics ≥8.3, để fine-tune/evaluate)
+  - `.venv-classify` ← `requirements/classify.txt` (SigLIP2/transformers, cho `src/catalog/build_embeddings.py`)
+  - `.venv-e2e` ← `requirements/e2e.txt` (kết hợp YOLO checkpoint-compatible + SigLIP2 chạy chung 1 process, cho `scripts/run_scan_e2e.py`)
 
 ## Future Work
 

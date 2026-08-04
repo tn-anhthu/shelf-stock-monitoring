@@ -1,6 +1,6 @@
 # Combined deps for scripts/run_scan_e2e.py and scripts/visualize_scan_e2e.py,
-# which need both a checkpoint-compatible YOLO (requirements-train.txt) and
-# SigLIP2 (requirements-classify.txt) in the same process. Neither
+# which need both a checkpoint-compatible YOLO (requirements/train.txt) and
+# SigLIP2 (requirements/classify.txt) in the same process. Neither
 # .venv-benchmark (ultralytics==8.0.43, pinned for old checkpoint pickle
 # compat) nor .venv-train (no torch/transformers) can run both.
 torch==2.5.1
