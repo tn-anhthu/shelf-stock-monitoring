@@ -9,10 +9,12 @@ persist_scan() (called after the employee confirms in the UI) writes to
 inventory — run_scan() itself never writes to the database.
 """
 import json
+import statistics
 from datetime import datetime, timezone
 from typing import Callable, Dict, List, Optional, Tuple
 
 from src.catalog.db import insert_inventory_records, insert_scan_history
+from src.detection.benchmark.metrics import Box
 from src.pipeline.aggregate import aggregate_quantities, compute_value, flag_status
 from src.pipeline.box_filter import filter_anomalous_boxes, filter_contained_boxes
 from src.pipeline.box_merge import merge_adjacent_fragments
@@ -22,6 +24,58 @@ from src.pipeline.crop import crop_box
 from src.pipeline.gap_detection import detect_gaps
 
 CONFIDENCE_THRESHOLD = 0.5
+
+# Calibrated 2026-08-04 via scripts/calibrate_adaptive_tolerances.py against
+# the 5 raw (uncropped) test images — see
+# docs/superpowers/specs/2026-08-04-adaptive-box-tolerance-design.md.
+# Includes a 0.87 safety margin below the raw pooled-median ratio (0.051246):
+# on test3, the raw ratio pushed row_cluster_tolerance to 23.10px, flipping
+# cluster_rows' row grouping (the flip happens between 21.0px, still safe, and
+# 21.5px) and producing a phantom gap spanning almost the entire Yakult shelf
+# row. A first fix (0.88 margin) landed at 20.33px — only 0.67px/3.2% below
+# the 21.0px safe bound, too tight relative to normal detector jitter. This
+# margin instead lands at ~20.10px at test3's scale: close to the original
+# 20.0px hardcoded value (known safe across all 5 calibration images), with
+# ~0.9px/4.3% headroom below the 21.0px danger zone.
+ROW_CLUSTER_TOLERANCE_RATIO = 0.044584
+# Includes a 0.67 safety margin below the raw pooled-median ratio (0.012812):
+# on test3, the raw ratio pushed y_gap_tolerance to 5.78px, crossing the real
+# ~5.1px gap between two separate stacked Yakult 5-packs and wrongly merging
+# them into one unclassifiable box. A first fix (0.85 margin) landed at
+# 4.91px — only 0.19px/3.7% below that 5.1px ceiling, too tight. The only
+# evidence-backed lower bound on this tolerance is the real fragment case in
+# tests/pipeline/test_box_merge.py::test_merge_adjacent_fragments_merges_real_measured_split_case
+# (measured y_gap=-1.7, i.e. the fragments actually overlap in y) — so there's
+# no meaningful floor pushing this ratio up, and much more room to lower it.
+# (An earlier version of this comment cited a "~2.6px margin" from
+# docs/reports/week-02/2026-07-30.md as this tolerance's evidence — that was
+# a misread: that report describes a *different*, abandoned experiment that
+# tried a new y_gap_tolerance, measured only 2.6px of margin, judged it
+# unsafe, and left the threshold unchanged/backlogged. It was never bridged
+# by this tolerance.) This margin lands at ~3.87px at test3's scale: clear of
+# the 5.1px ceiling by ~1.23px/24%, still well above the -1.7px floor so
+# genuine fragment-merge cases elsewhere keep working.
+Y_GAP_TOLERANCE_RATIO = 0.008584
+
+
+def adaptive_tolerances(boxes: List[Box]) -> Tuple[float, float]:
+    """Return (row_cluster_tolerance, y_gap_tolerance) scaled to the median
+    detected-box height in this image, instead of a hardcoded absolute pixel
+    value — so results don't degrade when the input image's resolution
+    changes (e.g. the UI's manual CropStep). Falls back to the historical
+    absolute values (20.0, 5.0) when fewer than 2 boxes are detected: there's
+    no meaningful median to compute, and every caller of these tolerances
+    already skips the comparison entirely when len(boxes) < 2, so the
+    fallback value here is never actually exercised — it only keeps the
+    return type consistent.
+    """
+    if len(boxes) < 2:
+        return 20.0, 5.0
+    median_height = statistics.median(b[3] - b[1] for b in boxes)
+    return (
+        ROW_CLUSTER_TOLERANCE_RATIO * median_height,
+        Y_GAP_TOLERANCE_RATIO * median_height,
+    )
 
 
 def run_scan(
@@ -56,10 +110,11 @@ def run_scan(
         roi_crop_bbox = roi_result.bbox
 
     boxes = detect_fn(image)
-    boxes = merge_adjacent_fragments(boxes)
-    boxes = filter_anomalous_boxes(boxes)
+    row_cluster_tolerance, y_gap_tolerance = adaptive_tolerances(boxes)
+    boxes = merge_adjacent_fragments(boxes, y_gap_tolerance=y_gap_tolerance)
+    boxes = filter_anomalous_boxes(boxes, row_cluster_tolerance=row_cluster_tolerance)
     boxes, flagged_regions = filter_contained_boxes(boxes)
-    gaps = detect_gaps(boxes)
+    gaps = detect_gaps(boxes, row_cluster_tolerance=row_cluster_tolerance)
 
     # Phase 1 (sequential): crop + embed + cosine-rank candidates per box.
     # Stays sequential because embed_fn shares the SigLIP2 model/GPU across

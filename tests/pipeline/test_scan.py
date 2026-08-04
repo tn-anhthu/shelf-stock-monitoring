@@ -10,7 +10,7 @@ from src.pipeline.box_filter import filter_anomalous_boxes, filter_contained_box
 from src.pipeline.box_merge import merge_adjacent_fragments
 from src.pipeline.gap_detection import detect_gaps
 from src.pipeline.roi_crop import RoiCropResult
-from src.pipeline.scan import persist_scan, run_scan
+from src.pipeline.scan import ROW_CLUSTER_TOLERANCE_RATIO, Y_GAP_TOLERANCE_RATIO, adaptive_tolerances, persist_scan, run_scan
 
 FAKE_IMAGE = Image.new("RGB", (200, 200))
 
@@ -70,6 +70,46 @@ def fake_embed_fn(crop_image):
     # crop_image is unused by the fake; return a fixed vector so classify_crop
     # always matches "choco_pie_orion" (see catalog_embeddings below)
     return np.array([1.0, 0.0])
+
+
+def test_adaptive_tolerances_scales_with_median_box_height():
+    # heights: 100, 200, 300 -> median 200
+    boxes = [(0, 0, 100, 100), (200, 0, 300, 200), (400, 0, 500, 300)]
+    row_cluster_tolerance, y_gap_tolerance = adaptive_tolerances(boxes)
+    assert row_cluster_tolerance == ROW_CLUSTER_TOLERANCE_RATIO * 200
+    assert y_gap_tolerance == Y_GAP_TOLERANCE_RATIO * 200
+
+
+def test_adaptive_tolerances_falls_back_with_fewer_than_2_boxes():
+    assert adaptive_tolerances([]) == (20.0, 5.0)
+    assert adaptive_tolerances([(0, 0, 100, 100)]) == (20.0, 5.0)
+
+
+def test_adaptive_tolerances_stay_below_test3_danger_thresholds():
+    # Pins the actual real-world invariants Task 4's verification discovered on
+    # test3.HEIC (median detected-box height ~450.9px), independent of the
+    # exact ROW_CLUSTER_TOLERANCE_RATIO / Y_GAP_TOLERANCE_RATIO literals -
+    # unlike test_adaptive_tolerances_scales_with_median_box_height above,
+    # which imports those same constants and would stay green even if they
+    # were changed to values that reintroduce this exact regression.
+    #
+    # row_cluster_tolerance: at test3's scale, cluster_rows' row grouping was
+    # empirically found to flip between 21.0px (still safe) and 21.5px,
+    # producing a phantom gap spanning almost the entire Yakult shelf row.
+    # y_gap_tolerance: at test3's scale, a value of 5.78px crosses the real
+    # ~5.1px gap between two separate, correctly-classified stacked Yakult
+    # 5-packs and wrongly merges them into one unclassifiable box.
+    #
+    # Boxes below are synthetic, chosen only so their median height (b[3]-b[1])
+    # is ~450.9px to match test3's real detected scale.
+    boxes = [
+        (0, 0, 100, 449.0),
+        (0, 0, 100, 450.9),
+        (0, 0, 100, 452.0),
+    ]
+    row_cluster_tolerance, y_gap_tolerance = adaptive_tolerances(boxes)
+    assert row_cluster_tolerance < 21.0
+    assert y_gap_tolerance < 5.1
 
 
 def test_run_scan_produces_quantities_value_and_flags():
@@ -145,11 +185,16 @@ def test_run_scan_merges_and_filters_boxes_before_classify_and_gaps():
         llm_client=FakeLLMClient(answer="choco_pie_orion"),
     )
 
-    cleaned_boxes = filter_anomalous_boxes(merge_adjacent_fragments(fake_detect_fn_with_fragments(None)))
+    raw_boxes = fake_detect_fn_with_fragments(None)
+    row_cluster_tolerance, y_gap_tolerance = adaptive_tolerances(raw_boxes)
+    cleaned_boxes = filter_anomalous_boxes(
+        merge_adjacent_fragments(raw_boxes, y_gap_tolerance=y_gap_tolerance),
+        row_cluster_tolerance=row_cluster_tolerance,
+    )
     cleaned_boxes, _flagged = filter_contained_boxes(cleaned_boxes)
     assert len(cleaned_boxes) == 3
     assert len(result["detections"]) == 3
-    assert result["gaps"] == detect_gaps(cleaned_boxes)
+    assert result["gaps"] == detect_gaps(cleaned_boxes, row_cluster_tolerance=row_cluster_tolerance)
 
 
 def test_run_scan_drops_redundant_containing_box_and_reports_flagged_regions():
@@ -227,7 +272,9 @@ def test_run_scan_includes_gaps_from_detected_boxes():
         llm_client=FakeLLMClient(answer="choco_pie_orion"),
     )
 
-    assert result["gaps"] == detect_gaps(fake_detect_fn(None))
+    raw_boxes = fake_detect_fn(None)
+    row_cluster_tolerance, _y_gap_tolerance = adaptive_tolerances(raw_boxes)
+    assert result["gaps"] == detect_gaps(raw_boxes, row_cluster_tolerance=row_cluster_tolerance)
 
 
 def test_run_scan_flags_undetected_catalog_sku_as_out():

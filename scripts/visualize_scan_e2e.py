@@ -62,6 +62,7 @@ from src.pipeline.confidence import is_low_confidence
 from src.pipeline.crop import crop_box
 from src.pipeline.gap_detection import detect_gaps
 from src.pipeline.review_export import append_review_sheet, format_candidates
+from src.pipeline.scan import adaptive_tolerances
 
 DEFAULT_DB_PATH = "data/shelfsense.db"
 DEFAULT_TOP_K = 5
@@ -173,10 +174,13 @@ def main():
     boxes = detect_1a(yolo_model, shelf_image)
     print(f"YOLO detected {len(boxes)} boxes")
 
-    boxes_merged = merge_adjacent_fragments(boxes)
+    row_cluster_tolerance, y_gap_tolerance = adaptive_tolerances(boxes)
+    print(f"adaptive_tolerances: row_cluster={row_cluster_tolerance:.2f}px, y_gap={y_gap_tolerance:.2f}px")
+
+    boxes_merged = merge_adjacent_fragments(boxes, y_gap_tolerance=y_gap_tolerance)
     print(f"After merge_adjacent_fragments: {len(boxes)} -> {len(boxes_merged)} boxes")
 
-    boxes = filter_anomalous_boxes(boxes_merged)
+    boxes = filter_anomalous_boxes(boxes_merged, row_cluster_tolerance=row_cluster_tolerance)
     print(f"After filter_anomalous_boxes: {len(boxes_merged)} -> {len(boxes)} boxes")
 
     boxes_before_containment = len(boxes)
@@ -186,7 +190,7 @@ def main():
         f"({len(flagged_regions)} flagged for review)"
     )
 
-    gaps = detect_gaps(boxes)
+    gaps = detect_gaps(boxes, row_cluster_tolerance=row_cluster_tolerance)
     print(f"Gap detection flagged {len(gaps)} suspicious gap(s)")
     for gx1, gy1, gx2, gy2 in gaps:
         print(f"  gap: box_coords={tuple(round(v) for v in (gx1, gy1, gx2, gy2))}")
