@@ -1,5 +1,5 @@
 """Merge YOLO boxes that are really one physical product sliced into vertically
-stacked fragments (see scripts/debug_box_fragments.py) back into a single box,
+stacked fragments (see scripts/archive/debug_box_fragments.py) back into a single box,
 so downstream quantity counting and gap detection see the real product count.
 
 Deliberately does NOT reuse row_clustering.cluster_rows: two fragments of one

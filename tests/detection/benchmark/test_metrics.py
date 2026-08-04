@@ -39,7 +39,7 @@ def test_containment_ratio_no_overlap_returns_zero():
 
 def test_containment_ratio_real_haohao_pair_is_high_despite_moderate_iou():
     # box41 (top cup only) swallowed by box45 (both cups) - real coords from
-    # scripts/debug_duplicate_boxes.py.
+    # scripts/archive/debug_duplicate_boxes.py.
     box41 = (1109.0, 2840.4, 1326.8, 3116.4)
     box45 = (1116.5, 2843.7, 1326.5, 3254.9)
     assert containment_ratio(box41, box45) > 0.9

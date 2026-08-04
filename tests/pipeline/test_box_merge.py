@@ -2,7 +2,7 @@ from src.pipeline.box_merge import merge_adjacent_fragments
 
 
 def test_merge_adjacent_fragments_merges_real_measured_split_case():
-    # Real pair measured on the milk-shelf photo (scripts/debug_box_fragments.py):
+    # Real pair measured on the milk-shelf photo (scripts/archive/debug_box_fragments.py):
     # IoU=0.025, x_overlap_ratio=1.00, y_gap=-1.7, bottom fragment aspect_ratio=0.33
     # vs top fragment's 1.12 -> should merge into one box.
     boxes = [(184.0, 286.2, 231.3, 339.2), (183.9, 337.5, 232.0, 353.3)]

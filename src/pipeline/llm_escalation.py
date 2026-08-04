@@ -1,7 +1,7 @@
 """Verify a classify_crop candidate shortlist against the real crop image via
 Claude Haiku, since SigLIP2 cosine similarity alone can't reliably separate
 near-identical packaging (same-brand flavor variants, cross-brand same-can
-shape) — see scripts/llm_escalation_experiment.py for the experiment that
+shape) — see scripts/archive/llm_escalation_experiment.py for the experiment that
 established this.
 
 Each candidate's own catalog reference photo (data/catalog/images/<sku_id>/1.jpg)

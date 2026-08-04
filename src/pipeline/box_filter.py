@@ -7,7 +7,7 @@ from typing import List, Tuple
 from src.detection.benchmark.metrics import Box, compute_iou, containment_ratio
 from src.pipeline.row_clustering import cluster_rows
 
-# Same signature scripts/debug_duplicate_boxes.py used to confirm the 3 known
+# Same signature scripts/archive/debug_duplicate_boxes.py used to confirm the 3 known
 # duplicate-detection cases: high containment (one box almost entirely inside
 # another) but IoU below the model's NMS default (0.7), so NMS itself never
 # catches these - the two boxes are too different in size for IoU to look
