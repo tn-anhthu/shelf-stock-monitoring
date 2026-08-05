@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react';
+import { isHeic, heicTo } from 'heic-to';
 import Button from '../../shared/ui/Button.jsx';
 import Input from '../../shared/ui/Input.jsx';
 import { useObjectUrl } from '../../shared/useObjectUrl.js';
@@ -7,14 +8,36 @@ export default function UploadStep({ onNext }) {
   const [storeId, setStoreId] = useState('');
   const [shelfId, setShelfId] = useState('');
   const [file, setFile] = useState(null);
+  const [converting, setConverting] = useState(false);
+  const [convertError, setConvertError] = useState(null);
   const previewUrl = useObjectUrl(file);
   const cameraInputRef = useRef(null);
   const galleryInputRef = useRef(null);
 
-  const canSubmit = storeId.trim() && shelfId.trim() && file;
+  const canSubmit = storeId.trim() && shelfId.trim() && file && !converting;
 
-  function handleFileChange(event) {
-    setFile(event.target.files?.[0] ?? null);
+  async function handleFileChange(event) {
+    const picked = event.target.files?.[0] ?? null;
+    if (!picked) {
+      setFile(null);
+      return;
+    }
+    setConvertError(null);
+    if (await isHeic(picked)) {
+      setConverting(true);
+      try {
+        const jpegBlob = await heicTo({ blob: picked, type: 'image/jpeg', quality: 0.92 });
+        const convertedName = picked.name.replace(/\.(heic|heif)$/i, '.jpg');
+        setFile(new File([jpegBlob], convertedName, { type: 'image/jpeg' }));
+      } catch (err) {
+        setConvertError('Không đọc được ảnh HEIC này. Thử chọn ảnh khác hoặc chuyển sang JPG/PNG.');
+        setFile(null);
+      } finally {
+        setConverting(false);
+      }
+      return;
+    }
+    setFile(picked);
   }
 
   function handleSubmit(event) {
@@ -52,7 +75,15 @@ export default function UploadStep({ onNext }) {
       <div>
         <span className="text-sm font-medium text-ink">Ảnh kệ hàng</span>
 
-        {previewUrl ? (
+        {convertError && (
+          <p className="mt-2 rounded-lg bg-status-out-bg px-3 py-2 text-sm text-status-out-text">{convertError}</p>
+        )}
+
+        {converting ? (
+          <div className="mt-2 flex h-32 items-center justify-center rounded-xl border border-dashed border-card-border text-sm text-text-muted">
+            Đang xử lý ảnh HEIC...
+          </div>
+        ) : previewUrl ? (
           <img
             src={previewUrl}
             alt="Ảnh kệ hàng đã chọn"
@@ -67,7 +98,7 @@ export default function UploadStep({ onNext }) {
         <input
           ref={cameraInputRef}
           type="file"
-          accept="image/*"
+          accept="image/*,.heic,.heif"
           capture="environment"
           onChange={handleFileChange}
           className="hidden"
@@ -75,7 +106,7 @@ export default function UploadStep({ onNext }) {
         <input
           ref={galleryInputRef}
           type="file"
-          accept="image/*"
+          accept="image/*,.heic,.heif"
           onChange={handleFileChange}
           className="hidden"
         />

@@ -12,7 +12,8 @@
   "dependencies": {
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "react-cropper": "^2.3.3"
+    "react-cropper": "^2.3.3",
+    "heic-to": "^1.5.2"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",

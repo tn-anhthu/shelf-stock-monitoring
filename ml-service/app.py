@@ -14,6 +14,9 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, File, UploadFile
 from google import genai
 from PIL import Image
+import pillow_heif
+
+pillow_heif.register_heif_opener()
 
 from mapping import map_scan_result_to_response
 from src.catalog.db import get_connection, list_catalog
