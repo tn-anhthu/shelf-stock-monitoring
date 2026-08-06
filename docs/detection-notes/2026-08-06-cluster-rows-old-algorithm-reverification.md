@@ -1,5 +1,11 @@
 # Old-algorithm reverification report: does any of the original 4 cited cases still justify the Task-1 `cluster_rows` fix under the current system?
 
+> **Archived as written on 06/08/2026, TRƯỚC khi revert.** "Currently committed", "hiện tại", hay
+> các cụm tương tự trong báo cáo này đều chỉ trạng thái tại thời điểm viết (commit `4a9ffed`,
+> thuật toán row-mean + span-cap) — KHÔNG phải trạng thái hiện tại của `row_clustering.py`. File
+> này đã được revert về thuật toán gốc ngay trong chính commit đã lưu báo cáo này (xem
+> `docs/detection-notes/detection-log.md`, mục 06/08/2026).
+
 Status: **DONE** (no "could not verify" gaps — every number below is real command
 output from a fresh run this session, no reused approximate numbers).
 
@@ -50,7 +56,7 @@ total rows: 23
 
 candidates with span > tolerance (23.4291):
   row 4: n=4 yc=(1398.0-1424.6) span=26.6 (1.13x tolerance)
-  row 5: n=5 yc=(1456.5-1500.3) span=43.9 (1.87x tolerance)
+  row 5: n=5 yc=(1456.5-1500.3) span=43.8 (1.87x tolerance)
   row 9: n=3 yc=(2314.3-2343.1) span=28.8 (1.23x tolerance)
   row 18: n=12 yc=(3242.5-3338.5) span=96.0 (4.10x tolerance)
 ```
@@ -207,8 +213,9 @@ yc=3010.9, delta=38.4px; vs. box48 yc=3229.0, delta=179.7px) both exceed
 `row_cluster_tolerance` (18.95px) directly, with no intermediate boxes to
 chain through. The OLD algorithm's chaining failure mode (bridging via a
 sequence of intermediate boxes each individually within tolerance) simply
-doesn't apply here — there's a real, isolated >2x-tolerance gap on both
-sides of box45, not a chain of small steps.
+doesn't apply here — there's a real, isolated gap that exceeds tolerance on
+both sides of box45 (38.4px and 179.7px vs. 18.95px), not a chain of small
+steps.
 
 ### Where box45 actually gets resolved: `filter_contained_boxes`
 
@@ -267,9 +274,10 @@ with the numeric finding that both algorithms treat this area identically.
 **This is not evidence of a `cluster_rows` chaining bug in the current
 system.** `box45_both_cups` never bridges box41's row and box48's
 "row"-slot under either algorithm — it's an isolated singleton row in both,
-because the real y-center gaps around it (38.4px and 179.7px, both >2x
-`row_cluster_tolerance`) are too large for the chaining mechanism to even
-apply, chain-of-intermediate-boxes or not. The function that actually
+because the real y-center gaps around it exceed tolerance on both sides
+(38.4px and 179.7px vs. 18.95px `row_cluster_tolerance`) and are too large
+for the chaining mechanism to even apply, chain-of-intermediate-boxes or
+not. The function that actually
 resolves this case is `filter_contained_boxes` (containment/leftover-coverage
 logic), which behaves identically regardless of which `cluster_rows`
 version feeds it, and correctly drops `box45` as redundant given `box41` and
@@ -362,8 +370,9 @@ Across all 4 originally-cited cases, re-verified under the current system
 
 1. **Hảo Hảo (test1)** — Investigation 2: not a `cluster_rows` bug at all.
    `box45_both_cups` is an isolated singleton row under both OLD and NEW
-   (real y-center gaps on both sides already exceed 2x tolerance with no
-   intermediate boxes to chain through). The case is fully resolved by
+   (real y-center gaps on both sides already exceed tolerance -- 38.4px and
+   179.7px vs. 18.95px -- with no intermediate boxes to chain through). The
+   case is fully resolved by
    `filter_contained_boxes`, identically regardless of `cluster_rows`
    version. **Ruled out.**
 2. **Yakult, `full`-checkpoint-era (test3)** — Investigation 3: does not

@@ -1,5 +1,11 @@
 # Diagnostic Report: cluster_rows chaining fix — visual/mechanical evidence for human decision
 
+> **Archived as written on 06/08/2026, TRƯỚC khi revert.** "Currently committed", "hiện tại", hay
+> các cụm tương tự trong báo cáo này đều chỉ trạng thái tại thời điểm viết (commit `4a9ffed`,
+> thuật toán row-mean + span-cap) — KHÔNG phải trạng thái hiện tại của `row_clustering.py`. File
+> này đã được revert về thuật toán gốc ngay trong chính commit đã lưu báo cáo này (xem
+> `docs/detection-notes/detection-log.md`, mục 06/08/2026).
+
 Status: DONE_WITH_CONCERNS (see "What could not be verified" at the end — everything
 else below is real command output, no estimates).
 
@@ -46,7 +52,7 @@ candidates) match Task 3's report exactly:
 
 ```
 old row 4: n=4 yc=(1398.0-1424.6) span=26.6 (1.13x tolerance)
-old row 5: n=5 yc=(1456.5-1500.3) span=43.9 (1.87x tolerance)
+old row 5: n=5 yc=(1456.5-1500.3) span=43.8 (1.87x tolerance)
 old row 9: n=3 yc=(2314.3-2343.1) span=28.8 (1.23x tolerance)
 old row 18: n=12 yc=(3242.5-3338.5) span=96.0 (4.10x tolerance)
 ```

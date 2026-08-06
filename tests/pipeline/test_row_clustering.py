@@ -12,8 +12,9 @@ the 2 full investigation reports it cites
 docs/detection-notes/2026-08-06-cluster-rows-old-algorithm-reverification.md).
 
 Every box tuple below is a real detection from the n_2000 checkpoint
-(runs/detect/runs/train_1a/n_2000/weights/best.pt) on test1.HEIC/test3.HEIC,
-copied verbatim from those 2 reports -- not synthetic. Tolerances are the
+(runs/detect/runs/train_1a/n_2000/weights/best.pt) on test1.HEIC/test3.HEIC --
+copied verbatim from the 2 archived reports where available, or freshly
+re-derived and noted per-test where not -- not synthetic. Tolerances are the
 real adaptive_tolerances() output for the corresponding image. The point of
 this file is to pin down the OLD (now-reverted, current) algorithm's
 confirmed-correct behavior on real data, so an accidental future
@@ -51,7 +52,7 @@ def test_row5_five_side_by_side_bottles_cluster_into_one_row():
     # genuine physical shelf row (visually confirmed in the diagnostic
     # report). This is the case where the NOW-REVERTED new (row-mean +
     # span-cap) algorithm incorrectly split it into 2 groups (3+2) because
-    # its 43.9px span exceeds the span cap. This test protects against that
+    # its 43.8px span exceeds the span cap. This test protects against that
     # regression specifically.
     boxes = [
         (185.9, 1123.0, 443.0, 1877.7),
@@ -142,8 +143,8 @@ def test_hao_hao_row_plus_isolated_singletons():
     # boxes from the same image -- box45_both_cups and box48_bottom_cup, also
     # from tests/pipeline/test_box_filter.py -- that must each remain their
     # own isolated singleton row under BOTH algorithms: the real y-center
-    # gaps around them (38.4px and 179.7px respectively) exceed 2x tolerance
-    # with no intermediate boxes to chain through.
+    # gaps around them exceed tolerance on both sides (38.4px and 179.7px vs.
+    # 18.95px tolerance) with no intermediate boxes to chain through.
     row_boxes = [
         (1109.0, 2840.4, 1326.8, 3116.4),
         (1996.9, 2883.3, 2313.3, 3107.9),

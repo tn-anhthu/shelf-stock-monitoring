@@ -133,10 +133,10 @@ luận từ code — để xác nhận lại 3 case gốc trước khi coi fix l
 dưới hệ thống hiện tại:**
 
 1. **Hảo Hảo crop (test1)** — không phải lỗi `cluster_rows`. Box `box45_both_cups` là singleton
-   row dưới CẢ 2 thuật toán (cũ và mới) — khoảng cách y-center thật ở cả 2 phía (38.4px và
-   179.7px) đều đã vượt 2x tolerance, không có box trung gian nào để "bắc cầu" qua. Case này
-   thực ra được xử lý (đúng) bởi `filter_contained_boxes` (logic containment/leftover-coverage),
-   không liên quan gì đến `cluster_rows`.
+   row dưới CẢ 2 thuật toán (cũ và mới) — khoảng cách y-center thật vượt tolerance ở cả 2 phía
+   (38.4px và 179.7px so với tolerance=18.9501px), không có box trung gian nào để "bắc cầu" qua.
+   Case này thực ra được xử lý (đúng) bởi `filter_contained_boxes` (logic
+   containment/leftover-coverage), không liên quan gì đến `cluster_rows`.
 2. **Yakult checkpoint `full` cũ (test3)** — không tái hiện với checkpoint `n_2000`. Đây là
    artifact của checkpoint `full` (đã sửa riêng, xem phần đầu file) — box position khác hẳn giữa
    2 checkpoint. Chạy thuật toán cũ trực tiếp trên `n_2000` + tolerance hiện tại: 0 gap ảo quanh
