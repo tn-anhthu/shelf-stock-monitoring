@@ -65,6 +65,7 @@ from src.detection.train.run_trained_1a import detect_1a, load_model_1a
 from src.pipeline.box_filter import filter_anomalous_boxes, filter_contained_boxes
 from src.pipeline.box_merge import merge_adjacent_fragments
 from src.pipeline.gap_detection import detect_gaps
+from src.pipeline.row_clustering import cluster_rows, box_y_center
 from src.pipeline.scan import adaptive_tolerances
 
 DEFAULT_IMAGES = [
@@ -131,6 +132,14 @@ def main():
         help="If set (requires --image), saves an annotated image (boxes/NEEDS REVIEW/gaps, "
              "no classification) to <out>/annotated.jpg.",
     )
+    parser.add_argument(
+        "--sweep", type=str, default=None,
+        help="Comma-separated max_span_multiplier candidates to test directly against "
+             "cluster_rows() on the post-merge boxes of --image (e.g. '1.2,1.5,1.8,2.0,2.5,3.0'). "
+             "Requires exactly 2 --check-region values representing 2 known-DISTINCT physical "
+             "shelf rows -- reports, per candidate, whether the two regions land in the same "
+             "cluster_rows() row (FAIL, still chaining) or different rows (PASS).",
+    )
     args = parser.parse_args()
 
     model = load_model_1a(Path(args.weights))
@@ -142,6 +151,27 @@ def main():
         boxes_raw = detect_1a(model, image)
         row_cluster_tolerance, y_gap_tolerance = adaptive_tolerances(boxes_raw)
         boxes_merged = merge_adjacent_fragments(boxes_raw, y_gap_tolerance=y_gap_tolerance)
+
+        if args.sweep:
+            if len(regions) != 2:
+                parser.error("--sweep requires exactly 2 --check-region values (2 known-distinct rows)")
+            multipliers = [float(m) for m in args.sweep.split(",")]
+            print(f"\n=== sweep on {image_path} (post-merge, {len(boxes_merged)} boxes) ===")
+            for m in multipliers:
+                swept_rows = cluster_rows(boxes_merged, row_cluster_tolerance, max_span_multiplier=m)
+                row_of_region0 = next(
+                    (i for i, row in enumerate(swept_rows) if any(box_overlaps_region(b, regions[0]) for b in row)),
+                    None,
+                )
+                row_of_region1 = next(
+                    (i for i, row in enumerate(swept_rows) if any(box_overlaps_region(b, regions[1]) for b in row)),
+                    None,
+                )
+                same_row = row_of_region0 is not None and row_of_region0 == row_of_region1
+                status = "FAIL (still chained together)" if same_row else "PASS (correctly separated)"
+                print(f"  max_span_multiplier={m}: {len(swept_rows)} row(s) total -> {status}")
+            continue
+
         boxes_anom = filter_anomalous_boxes(boxes_merged, row_cluster_tolerance=row_cluster_tolerance)
         boxes_final, flagged_regions = filter_contained_boxes(boxes_anom)
         gaps = detect_gaps(boxes_final, row_cluster_tolerance=row_cluster_tolerance)
