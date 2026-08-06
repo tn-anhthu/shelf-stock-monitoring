@@ -182,8 +182,10 @@ xác nhận đang làm hỏng ít nhất 3 hàng kệ thật vốn đã đúng.
 `docs/detection-notes/2026-08-06-cluster-rows-diagnostic-report.md` và
 `docs/detection-notes/2026-08-06-cluster-rows-old-algorithm-reverification.md`.
 
-**Commit revert:** `394f71c` (`revert(pipeline): restore original cluster_rows algorithm after
-re-investigation`)
+**Commit revert:** commit có message `revert(pipeline): restore original cluster_rows algorithm
+after re-investigation` — không ghi SHA cụ thể ở đây (SHA của chính commit này thay đổi nếu nội
+dung file này thay đổi, nên ghi cứng vào đây sẽ luôn lệch); xem
+`git log --oneline -- src/pipeline/row_clustering.py` để lấy đúng SHA hiện tại.
 
 ## Bài học rút ra cho các lần sau
 
