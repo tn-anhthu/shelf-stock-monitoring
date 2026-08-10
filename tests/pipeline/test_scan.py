@@ -90,37 +90,50 @@ def test_adaptive_tolerances_falls_back_with_fewer_than_2_boxes():
 
 def test_adaptive_tolerances_stay_below_test3_danger_thresholds():
     # Pins the actual real-world invariants discovered on test3.HEIC (median
-    # detected-box height ~519.9px against the official n_2000 checkpoint -
+    # detected-box height ~566.9px against the production YOLO26n checkpoint -
     # see src/pipeline/scan.py's ROW_CLUSTER_TOLERANCE_RATIO/
     # Y_GAP_TOLERANCE_RATIO comments), independent of the exact ratio
     # literals - unlike test_adaptive_tolerances_scales_with_median_box_height
     # above, which imports those same constants and would stay green even if
     # they were changed to values that reintroduce this exact regression.
     #
-    # An earlier version of this test used ~450.9px (test3's scale under the
-    # `full` checkpoint, calibrated by mistake - see scan.py's comment) with
-    # thresholds 21.0px/5.1px. Those danger points were specific to `full`'s
-    # box positions and don't apply to n_2000's; re-measured directly against
-    # real cluster_rows()/merge_adjacent_fragments() output on n_2000's test3
-    # detections (see scan.py comments for the full sweep methodology):
+    # This test has now been re-pinned twice, because its thresholds are a
+    # function of one specific checkpoint's box *positions* and do not survive
+    # a checkpoint swap:
+    #   `full`   -> scale ~450.9px, thresholds 21.0px / 5.1px
+    #   n_2000   -> scale ~519.9px, thresholds 74.5px / 38.3px
+    #   YOLO26n  -> scale ~566.9px, thresholds below (current)
+    # Re-measured directly against real cluster_rows() /
+    # merge_adjacent_fragments() output on YOLO26n's test3 detections (see
+    # scan.py comments for the full sweep methodology):
     #
-    # row_cluster_tolerance: real danger (many rows collapsing into one,
-    # producing a phantom gap spanning almost a whole shelf row) starts at
-    # 74.5px on test3 with n_2000.
     # y_gap_tolerance: real danger (wrongly merging two separate,
-    # correctly-classified boxes into one) starts at 38.3px on test3 with
-    # n_2000.
+    # correctly-classified boxes into one) starts at 26.8px on test3 with
+    # YOLO26n - down from n_2000's 38.3px, so this bound genuinely tightened
+    # and the old 38.0px assert would no longer have caught it.
+    #
+    # row_cluster_tolerance: under YOLO26n *no* severe row collapse (max row
+    # size jumping 3+ boxes in one step) occurs above the calibrated operating
+    # point on test3 anywhere up to the 120px sweep limit - the only severe
+    # jump found sits at 11.5px, below the ~24.4px operating point, and is
+    # already passed through in normal operation. There is therefore no
+    # YOLO26n-measured danger point to pin here. Deliberate judgment call:
+    # retain n_2000's measured 74.5px collapse point as the bound rather than
+    # loosening the guard to the 120px sweep limit. Absence of a measured jump
+    # up to 120px is not positive evidence that 120px is safe, and at the new
+    # 566.9px scale this same 74.0px absolute is *stricter* in ratio terms than
+    # it was before (74.0/566.9 = 0.1305 vs 74.0/519.9 = 0.1423).
     #
     # Boxes below are synthetic, chosen only so their median height (b[3]-b[1])
-    # is ~519.9px to match test3's real n_2000-detected scale.
+    # is ~566.9px to match test3's real YOLO26n-detected scale.
     boxes = [
-        (0, 0, 100, 518.0),
-        (0, 0, 100, 519.9),
-        (0, 0, 100, 521.0),
+        (0, 0, 100, 565.0),
+        (0, 0, 100, 566.9),
+        (0, 0, 100, 568.0),
     ]
     row_cluster_tolerance, y_gap_tolerance = adaptive_tolerances(boxes)
     assert row_cluster_tolerance < 74.0
-    assert y_gap_tolerance < 38.0
+    assert y_gap_tolerance < 26.5
 
 
 def test_run_scan_produces_quantities_value_and_flags():

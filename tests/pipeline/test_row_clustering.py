@@ -23,8 +23,12 @@ caught immediately.
 """
 from src.pipeline.row_clustering import cluster_rows
 
-# Real adaptive_tolerances() row_cluster_tolerance for test3.HEIC (n_2000
-# checkpoint, current recalibrated ROW_CLUSTER_TOLERANCE_RATIO).
+# Real adaptive_tolerances() row_cluster_tolerance for test3.HEIC, frozen from
+# the n_2000 checkpoint at the ROW_CLUSTER_TOLERANCE_RATIO of that era. These
+# are deliberately-frozen historical fixture values, NOT the current ratio --
+# they pin row-clustering *behaviour* at a known tolerance, so they must stay
+# put across checkpoint recalibrations (scan.py's ratio is now YOLO26n-derived
+# and no longer reproduces these numbers).
 TEST3_TOLERANCE = 23.4291
 
 # Real adaptive_tolerances() row_cluster_tolerance for test1.HEIC.

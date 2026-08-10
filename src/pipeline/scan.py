@@ -97,11 +97,26 @@ CONFIDENCE_THRESHOLD = 0.5
 # cluster_rows() on YOLO26n's post-merge boxes, looking for the same severe
 # signature (max row size jumping 3+ boxes in one step): **no severe jump
 # occurs above the calibrated tolerance on any of the 5 images, anywhere up to
-# 120px.** That is strictly safer than n_2000, whose tightest margin was test1
-# at only +5.55px (jump at 24.5px vs 18.95px calibrated). YOLO26n's remaining
-# jumps all sit *below* the calibrated tolerance (test1 5.5px and 16.0px,
-# test2 9.0px, test3 11.5px, test4 4.0px and 11.5px) — those are already
-# passed through in normal operation and are not a boundary being approached.
+# 120px.** Under n_2000 the tightest such margin was test1 at only +5.55px
+# (jump at 24.5px vs 18.95px calibrated). So: no severe collapse exists above
+# the operating point, which means upward scale drift alone will not trigger
+# one.
+#
+# That is deliberately narrower than "strictly safer than n_2000", which an
+# earlier draft of this block claimed. The above-the-operating-point metric is
+# the one that makes the historical "~51px" reproduce, but it is blind to
+# danger *below* the operating point, and by that second measure test1 actually
+# regressed: its nearest severe jump moved from +5.55px above the operating
+# point (n_2000) to 2.76px *below* it (YOLO26n: jump at 16.0px vs 18.76px
+# calibrated). Not treated as a live hazard — test1 emits 0 gaps under both
+# checkpoints, so the row-count shift changes no output, and it is consistent
+# with the duplicate-collapse seen elsewhere in this migration — but the honest
+# summary is "safe against drift upward", not "safe in every direction".
+#
+# YOLO26n's remaining jumps all sit *below* the calibrated tolerance (test1
+# 5.5px and 16.0px, test2 9.0px, test3 11.5px, test4 4.0px and 11.5px) — those
+# are already passed through in normal operation and are not a boundary being
+# approached.
 #
 # The sweep harness was validated before being trusted: re-run against n_2000's
 # cached detections it reproduces this block's own historical numbers — test3's
@@ -142,9 +157,17 @@ ROW_CLUSTER_TOLERANCE_RATIO = 0.043050
 #     test4  5.93px calibrated  ->  no merge anywhere <=150px
 #     test5  2.51px calibrated  ->  no merge anywhere <=150px
 #
-# The tightest margin (test2, +3.18px) is marginally better than n_2000's
+# The tightest margin (test2, +3.18px) is slightly *worse* than n_2000's
 # equivalent (+3.41px at 2.99px calibrated vs a 6.4px first merge — same image,
-# same binding constraint), so the migration does not tighten this bound.
+# same binding constraint): the absolute margin eroded by 0.23px, or -6.7%.
+# That erosion is judged negligible, but on a normalized metric rather than the
+# raw pixel delta — these tolerances are ratios of box height, so the right
+# comparison is first-merge-event / calibrated-tolerance: n_2000 6.4/2.99 =
+# 2.14x, YOLO26n 6.0/2.82 = 2.13x, i.e. -0.6% relative. The margin still clears
+# the operating point by better than 2x on the binding image. Stated plainly so
+# a future reader is not left with the impression this bound improved: it did
+# not, it moved down slightly, and the claim being made is only that the
+# movement is small relative to the tolerance it is measured against.
 #
 # On the historical Yakult case: the ~5.1px stacked-5-pack gap described above
 # does not reproduce under YOLO26n, just as it no longer reproduced under
