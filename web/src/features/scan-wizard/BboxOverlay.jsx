@@ -45,8 +45,11 @@ export default function BboxOverlay({ imageUrl, imageWidth, imageHeight, boxes, 
       >
         <img src={imageUrl} alt="Ảnh kệ hàng đã phân tích" className="absolute inset-0 h-full w-full object-cover" />
         {boxes.map((box) => {
-          const pos = bboxToPercent(box.bbox, imageWidth, imageHeight);
           const style = getBoxStyle(box, quantities);
+          if (style.variant === 'hidden') {
+            return null;
+          }
+          const pos = bboxToPercent(box.bbox, imageWidth, imageHeight);
           const isHovered = style.variant === 'product' && !!hoveredSkuId && box.sku_id === hoveredSkuId;
 
           let border;
