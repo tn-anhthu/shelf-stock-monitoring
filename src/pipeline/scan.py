@@ -127,7 +127,7 @@ def run_scan(
     row_cluster_tolerance, y_gap_tolerance = adaptive_tolerances(boxes)
     boxes = merge_adjacent_fragments(boxes, y_gap_tolerance=y_gap_tolerance)
     boxes = filter_anomalous_boxes(boxes, row_cluster_tolerance=row_cluster_tolerance)
-    boxes, flagged_regions = filter_contained_boxes(boxes)
+    boxes, flagged_regions, flagged_pairs = filter_contained_boxes(boxes)
     gaps = detect_gaps(boxes, row_cluster_tolerance=row_cluster_tolerance)
 
     # Phase 1 (sequential): crop + embed + cosine-rank candidates per box.
@@ -140,7 +140,7 @@ def run_scan(
         depth = depth_by_index.get(i, 1)
         cropped = crop_box(image, box)
         if cropped is None:
-            detections[i] = {"sku_id": None, "confidence": 0.0, "depth": depth}
+            detections[i] = {"sku_id": None, "confidence": 0.0, "depth": depth, "excluded_from_count": False}
             continue
 
         # embed_fn(PIL.Image) -> np.ndarray — same contract as
@@ -167,11 +167,29 @@ def run_scan(
     # (token cost tracking) is aggregated there too; neither is persisted to
     # scan_history/inventory.
     for (i, depth, _, _), (sku_id, score, _reasoning, _usage, _ranked) in zip(pending, llm_results):
-        detections[i] = {"sku_id": sku_id, "confidence": score, "depth": depth}
+        detections[i] = {"sku_id": sku_id, "confidence": score, "depth": depth, "excluded_from_count": False}
+
+    # filter_contained_boxes flags NEEDS REVIEW pairs at the geometry level,
+    # before classify has run - it can't know which of the two represents the
+    # same physical item more reliably. Now that detections carry confidence,
+    # resolve each pair here: keep the higher-confidence box in the count,
+    # exclude the other (still shown on the UI, never deleted - see
+    # docs/superpowers/specs/2026-08-05-same-item-dedup-design.md).
+    box_position = {box: i for i, box in enumerate(boxes)}
+    for parent, child in flagged_pairs:
+        parent_i, child_i = box_position[parent], box_position[child]
+        # Tie: default to excluding the child, keeping the parent (a
+        # full-package box is usually a more complete representation) - ties
+        # are effectively never hit with real (float) confidence scores, so
+        # this is just a deterministic tie-break, not a load-bearing assumption.
+        loser_i = child_i if detections[child_i]["confidence"] <= detections[parent_i]["confidence"] else parent_i
+        detections[loser_i]["excluded_from_count"] = True
 
     low_confidence = is_low_confidence(detections, threshold=CONFIDENCE_THRESHOLD)
 
-    matched_detections = [d for d in detections if d["sku_id"] is not None]
+    matched_detections = [
+        d for d in detections if d["sku_id"] is not None and not d["excluded_from_count"]
+    ]
     quantities = aggregate_quantities(matched_detections)
     value = compute_value(quantities, catalog_items)
 

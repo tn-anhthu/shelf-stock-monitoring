@@ -115,6 +115,25 @@ describe('POST /analyze', () => {
     expect(res.body.total_value).toBe(60000 + 41000);
   });
 
+  test('excludes boxes flagged excluded_from_count from facing_count', async () => {
+    mlService.predict.mockResolvedValue({
+      image: { width: 1200, height: 900 },
+      boxes: [
+        { box_id: 'b1', bbox: [0, 0, 10, 10], type: 'product', sku_id: 'choco_pie_org', sku_name: 'Bánh chocopie Orion hộp 217.8g (6 cái)', confidence: 0.94, is_unknown: false, excluded_from_count: false },
+        { box_id: 'b2', bbox: [20, 0, 30, 10], type: 'product', sku_id: 'choco_pie_org', sku_name: 'Bánh chocopie Orion hộp 217.8g (6 cái)', confidence: 0.91, is_unknown: false, excluded_from_count: true },
+      ],
+      warnings: WARNINGS,
+    });
+
+    const res = await postAnalyze({ store_id: 'store_01', shelf_id: 'shelf_A1' });
+
+    expect(res.status).toBe(200);
+    expect(res.body.quantities).toHaveLength(1);
+    expect(res.body.quantities[0].facing_count).toBe(1);
+    // excluded box still comes back in boxes so the FE can draw the purple flag overlay.
+    expect(res.body.boxes).toHaveLength(2);
+  });
+
   test('rejects a request missing store_id/shelf_id/image with 400', async () => {
     const res = await postAnalyze({ shelf_id: 'shelf_A1' });
     expect(res.status).toBe(400);

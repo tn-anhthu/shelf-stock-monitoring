@@ -198,7 +198,7 @@ def test_run_scan_merges_and_filters_boxes_before_classify_and_gaps():
         merge_adjacent_fragments(raw_boxes, y_gap_tolerance=y_gap_tolerance),
         row_cluster_tolerance=row_cluster_tolerance,
     )
-    cleaned_boxes, _flagged = filter_contained_boxes(cleaned_boxes)
+    cleaned_boxes, _flagged, _pairs = filter_contained_boxes(cleaned_boxes)
     assert len(cleaned_boxes) == 3
     assert len(result["detections"]) == 3
     assert result["gaps"] == detect_gaps(cleaned_boxes, row_cluster_tolerance=row_cluster_tolerance)
@@ -261,6 +261,52 @@ def test_run_scan_flags_redundant_looking_box_when_leftover_uncovered():
     assert result["flagged_regions"] == [box38_melon_and_strawberry]
 
 
+def test_run_scan_excludes_lower_confidence_box_of_a_flagged_pair_from_count():
+    # fake_embed_fn returns a FIXED vector regardless of crop, so every box in
+    # the other tests always ties on confidence - not enough to exercise the
+    # new confidence-comparison logic (see docs/superpowers/specs/
+    # 2026-08-05-same-item-dedup-design.md section 9). This test needs an
+    # embed_fn that actually varies per crop (keyed off crop pixel area, since
+    # child/parent crop to different sizes) so parent and child get two real,
+    # different confidence scores.
+    child_melon = (20.0, 20.0, 70.0, 150.0)  # smaller box, fully inside parent
+    parent_both = (10.0, 20.0, 90.0, 160.0)  # larger box, swallows child
+
+    def detect_fn_twin(image):
+        return [child_melon, parent_both]
+
+    def embed_by_crop_size(crop_image):
+        # Child's crop area is 50*130=6500px; parent's is 80*140=11200px.
+        # Deliberately gives the SMALLER (child) crop the closer-matching
+        # vector, so the parent - despite being geometrically bigger - ends
+        # up with lower confidence and gets excluded. Proves the decision is
+        # confidence-based, not "always keep the bigger box".
+        width, height = crop_image.size
+        if width * height < 8000:
+            return np.array([1.0, 0.0])
+        return np.array([0.6, 0.4])
+
+    catalog_items = [{"sku_id": "choco_pie_orion", "name": "Chocopie", "price": 45000, "shelf_full_qty": 10}]
+    catalog_embeddings = [("choco_pie_orion", np.array([1.0, 0.0]))]
+
+    result = run_scan(
+        image=FAKE_IMAGE,
+        catalog_items=catalog_items,
+        catalog_embeddings=catalog_embeddings,
+        detect_fn=detect_fn_twin,
+        embed_fn=embed_by_crop_size,
+        llm_client=FakeLLMClient(answer="choco_pie_orion"),
+    )
+
+    assert result["boxes"] == [child_melon, parent_both]
+    child_detection, parent_detection = result["detections"]
+    assert child_detection["confidence"] == 1.0
+    assert parent_detection["confidence"] < 1.0
+    assert child_detection["excluded_from_count"] is False
+    assert parent_detection["excluded_from_count"] is True
+    # Only the higher-confidence (child) box counts toward quantity - the
+    # excluded parent isn't silently double-counting the same physical item.
+    assert result["quantities"] == {"choco_pie_orion": 1}
 
 
 
@@ -338,7 +384,9 @@ def test_run_scan_skips_embed_and_classify_for_degenerate_crop():
         llm_client=llm_client,
     )
 
-    assert result["detections"] == [{"sku_id": None, "confidence": 0.0, "depth": 1}]
+    assert result["detections"] == [
+        {"sku_id": None, "confidence": 0.0, "depth": 1, "excluded_from_count": False}
+    ]
     assert embed_calls == []
     assert llm_client.messages.calls == []
 

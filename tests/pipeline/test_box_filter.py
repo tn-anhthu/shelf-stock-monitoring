@@ -35,10 +35,11 @@ def test_filter_contained_boxes_deletes_redundant_box_haohao_crop45():
     box45_both_cups = (1116.5, 2843.7, 1326.5, 3254.9)
     box48_bottom_cup = (1125.5, 3098.8, 1318.6, 3359.2)
 
-    kept, flagged = filter_contained_boxes([box41_top_cup, box45_both_cups, box48_bottom_cup])
+    kept, flagged, pairs = filter_contained_boxes([box41_top_cup, box45_both_cups, box48_bottom_cup])
 
     assert set(kept) == {box41_top_cup, box48_bottom_cup}
     assert flagged == []
+    assert pairs == []
 
 
 def test_filter_contained_boxes_flags_instead_of_deleting_binggrae_crop38():
@@ -52,18 +53,63 @@ def test_filter_contained_boxes_flags_instead_of_deleting_binggrae_crop38():
     box37_melon_only = (702.7, 2476.3, 819.0, 2772.5)
     box38_melon_and_strawberry = (610.1, 2478.3, 820.7, 2808.7)
 
-    kept, flagged = filter_contained_boxes([box37_melon_only, box38_melon_and_strawberry])
+    kept, flagged, pairs = filter_contained_boxes([box37_melon_only, box38_melon_and_strawberry])
 
     assert set(kept) == {box37_melon_only, box38_melon_and_strawberry}
     assert flagged == [box38_melon_and_strawberry]
+    assert pairs == [(box38_melon_and_strawberry, box37_melon_only)]
 
 
 def test_filter_contained_boxes_no_containment_relationship_keeps_all_unflagged():
     boxes = [(0, 0, 50, 50), (60, 0, 110, 50)]
-    kept, flagged = filter_contained_boxes(boxes)
+    kept, flagged, pairs = filter_contained_boxes(boxes)
     assert kept == boxes
     assert flagged == []
+    assert pairs == []
 
 
 def test_filter_contained_boxes_empty_returns_empty_lists():
-    assert filter_contained_boxes([]) == ([], [])
+    assert filter_contained_boxes([]) == ([], [], [])
+
+
+def test_filter_contained_boxes_reports_a_pair_per_child_when_parent_has_multiple_children():
+    # Mirrors the Koreno Premium Kimchi case from docs/superpowers/specs/
+    # 2026-08-05-same-item-dedup-design.md: 1 parent box swallowing 3 separate
+    # child boxes (not just 1) -> flagged_pairs must contain one tuple per
+    # child, all sharing the same parent, so scan.py can compare confidence
+    # for each pair independently.
+    child_a = (10.0, 10.0, 40.0, 40.0)
+    child_b = (10.0, 60.0, 40.0, 90.0)
+    parent = (0.0, 0.0, 50.0, 100.0)
+
+    kept, flagged, pairs = filter_contained_boxes([child_a, child_b, parent])
+
+    assert flagged == [parent]
+    assert len(pairs) == 2
+    assert all(pair[0] == parent for pair in pairs)
+    assert {pair[1] for pair in pairs} == {child_a, child_b}
+
+
+def test_filter_contained_boxes_excludes_pairs_whose_child_was_independently_dropped():
+    # Reproduces a real crash found running run_scan() on
+    # data/scan_viz/input/test6.jpg: a 3-level nesting chain
+    # (grandparent contains middle contains small). `middle`'s own leftover
+    # (beyond `small`) is trivially covered by `grandparent` itself -
+    # containment_ratio(grandparent, middle) == 1.0 since middle sits fully
+    # inside it - so `middle` gets dropped as redundant in its OWN loop
+    # iteration, same as the Haohao case above. That decision is independent
+    # of `grandparent`'s own iteration, which (computed separately) lists
+    # `middle` as one of grandparent's children too, since `middle` also
+    # independently satisfies grandparent's containment/IoU thresholds.
+    # flagged_pairs must never reference a box that didn't survive into
+    # `kept` - scan.py's box_position lookup (keyed off the final kept boxes)
+    # would KeyError on a pair naming a box that no longer exists.
+    grandparent = (0.0, 0.0, 100.0, 100.0)
+    middle = (10.0, 10.0, 90.0, 90.0)
+    small = (20.0, 20.0, 50.0, 50.0)
+
+    kept, flagged, pairs = filter_contained_boxes([grandparent, middle, small])
+
+    assert middle not in kept  # existing behavior: redundant, covered by grandparent
+    assert set(kept) == {grandparent, small}
+    assert pairs == [(grandparent, small)]

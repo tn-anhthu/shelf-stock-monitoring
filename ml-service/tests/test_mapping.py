@@ -26,6 +26,7 @@ def test_maps_known_product_box():
             "sku_name": "Bánh chocopie Orion hộp 217.8g (6 cái)",
             "confidence": 0.94,
             "is_unknown": False,
+            "excluded_from_count": False,
         }
     ]
     assert result["warnings"] == {"low_confidence_regions": [], "edge_crop_regions": [], "blur_detected": False}
@@ -49,6 +50,7 @@ def test_maps_unknown_product_box_into_low_confidence_regions():
             "sku_name": None,
             "confidence": 0.55,
             "is_unknown": True,
+            "excluded_from_count": False,
         }
     ]
     assert result["warnings"]["low_confidence_regions"] == ["b0"]
@@ -72,8 +74,27 @@ def test_maps_gap_boxes_with_no_sku_and_continues_box_id_sequence():
         "confidence": 0.0,
         "is_unknown": False,
     }
+    # gap boxes never get an excluded_from_count field - they're not products
+    assert "excluded_from_count" not in result["boxes"][1]
     # gap boxes never count toward low_confidence_regions
     assert result["warnings"]["low_confidence_regions"] == []
+
+
+def test_maps_excluded_from_count_flag_from_detection_onto_product_box():
+    # scan.py sets excluded_from_count on the lower-confidence box of a
+    # NEEDS REVIEW parent/child pair (see src/pipeline/scan.py's flagged_pairs
+    # handling) - the API response must surface it so the UI can show the box
+    # (not hide it) while excluding it from the count. See
+    # docs/superpowers/specs/2026-08-05-same-item-dedup-design.md section 4.
+    scan_result = {
+        "boxes": [(10, 10, 110, 210)],
+        "detections": [{"sku_id": "choco_pie_org", "confidence": 0.57, "depth": 1, "excluded_from_count": True}],
+        "gaps": [],
+    }
+
+    result = map_scan_result_to_response(scan_result, CATALOG_ITEMS, image_width=1200, image_height=900)
+
+    assert result["boxes"][0]["excluded_from_count"] is True
 
 
 def test_multiple_products_get_sequential_box_ids():

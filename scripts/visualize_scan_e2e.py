@@ -184,7 +184,7 @@ def main():
     print(f"After filter_anomalous_boxes: {len(boxes_merged)} -> {len(boxes)} boxes")
 
     boxes_before_containment = len(boxes)
-    boxes, flagged_regions = filter_contained_boxes(boxes)
+    boxes, flagged_regions, _flagged_pairs = filter_contained_boxes(boxes)
     print(
         f"After filter_contained_boxes: {boxes_before_containment} -> {len(boxes)} boxes "
         f"({len(flagged_regions)} flagged for review)"

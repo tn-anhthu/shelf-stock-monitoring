@@ -4,7 +4,7 @@
 
 Case này đã có 2 nguồn tài liệu trước đó cần đối chiếu trước khi đo lại:
 
-- `docs/2026-07-21-session-report-classification-and-gap-detection.md` dòng 44:
+- `docs/session-reports/2026-07-21-session-report-classification-and-gap-detection.md` dòng 44:
   ghi nhận case "duplicate, IoU cao 0.5-0.7" trên ảnh demo thật (kệ sữa Vinamilk),
   hướng sửa đề xuất ban đầu là chỉnh `iou` trong `model.predict()`.
 - `scripts/debug_duplicate_boxes.py`: đã đo sẵn IoU/containment cho đúng case

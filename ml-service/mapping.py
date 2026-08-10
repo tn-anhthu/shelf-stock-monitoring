@@ -36,6 +36,7 @@ def map_scan_result_to_response(
                 "sku_name": catalog_entry["name"] if catalog_entry else None,
                 "confidence": detection["confidence"],
                 "is_unknown": is_unknown,
+                "excluded_from_count": detection.get("excluded_from_count", False),
             }
         )
         if is_unknown:

@@ -44,6 +44,7 @@ export default function EditStep({
 
   const totalValue = computeTotalValue(quantities);
   const availableToAdd = catalog.filter((item) => !isDuplicateSku(quantities, item.sku_id));
+  const excludedCount = boxes.filter((box) => box.excluded_from_count).length;
 
   function updateRow(index, patch) {
     setQuantities((prev) => prev.map((q, i) => (i === index ? { ...q, ...patch } : q)));
@@ -104,6 +105,12 @@ export default function EditStep({
   return (
     <div className="space-y-4 pb-32 md:pb-4">
       <h2 className="font-heading text-lg font-semibold text-ink">3. Kiểm tra & sửa số lượng</h2>
+
+      {excludedCount > 0 && (
+        <p className="rounded-lg bg-status-out-bg px-3 py-2 text-sm text-status-out-text">
+          ⚠️ {excludedCount} vùng cần kiểm tra kỹ (có thể trùng sản phẩm) — xem viền tím trên ảnh bên trái.
+        </p>
+      )}
 
       <div ref={containerRef} className="hidden md:flex">
         <div style={{ width: `${leftWidth}%` }} className="pr-3">
@@ -181,6 +188,7 @@ export default function EditStep({
               <th>sku_id</th>
               <th>confidence</th>
               <th>is_unknown</th>
+              <th>excluded_from_count</th>
             </tr>
           </thead>
           <tbody>
@@ -191,6 +199,7 @@ export default function EditStep({
                 <td>{box.sku_id ?? '—'}</td>
                 <td>{box.confidence.toFixed(2)}</td>
                 <td>{box.is_unknown ? 'có' : ''}</td>
+                <td>{box.excluded_from_count ? 'có' : ''}</td>
               </tr>
             ))}
           </tbody>

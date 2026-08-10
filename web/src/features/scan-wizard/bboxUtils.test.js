@@ -57,4 +57,13 @@ describe('getBoxStyle', () => {
       variant: 'gap',
     });
   });
+
+  test('marks excluded_from_count boxes as the excluded variant even when also is_unknown', () => {
+    expect(
+      getBoxStyle(
+        { type: 'product', sku_id: 'choco_pie_org', is_unknown: true, excluded_from_count: true },
+        quantities
+      )
+    ).toEqual({ variant: 'excluded' });
+  });
 });

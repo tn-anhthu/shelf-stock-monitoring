@@ -10,7 +10,7 @@ function aggregateQuantities(boxes, catalog) {
   const bySku = new Map();
 
   for (const box of boxes) {
-    if (box.type !== 'product' || !box.sku_id) continue;
+    if (box.type !== 'product' || !box.sku_id || box.excluded_from_count) continue;
     const catalogEntry = catalog.get(box.sku_id);
     if (!catalogEntry) continue;
 

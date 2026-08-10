@@ -1,9 +1,16 @@
 import { bboxToPercent, getBoxStyle } from './bboxUtils.js';
 import { getStatusStyle } from '../../shared/ui/statusStyles.js';
 
+const PRODUCT_BORDER_COLOR = {
+  ok: '#22C55E',
+  low: '#F59E0B',
+  out: '#EF4444',
+};
+
 const NEUTRAL_VARIANT_STYLE = {
-  unknown: { border: '2px dashed #94A3B8', background: 'rgba(148, 163, 184, 0.15)' },
-  gap: { border: '2px dashed #E2E8F0', background: 'transparent' },
+  unknown: { border: '1.5px dashed #64748B', background: 'rgba(100, 116, 139, 0.15)' },
+  gap: { border: '1.5px dashed #FACC15', background: 'transparent' },
+  excluded: { border: '1.5px dashed #A855F7', background: 'rgba(168, 85, 247, 0.2)' },
 };
 
 // statusStyles.js returns fully opaque hex backgrounds meant for StatusChip's
@@ -46,7 +53,8 @@ export default function BboxOverlay({ imageUrl, imageWidth, imageHeight, boxes, 
           let background;
           if (style.variant === 'product') {
             const statusStyle = getStatusStyle(style.flagStatus) ?? { bg: 'transparent', text: '#94A3B8' };
-            border = `${isHovered ? 3 : 2}px solid ${statusStyle.text}`;
+            const productColor = PRODUCT_BORDER_COLOR[style.flagStatus] ?? statusStyle.text;
+            border = `${isHovered ? 2.5 : 1.5}px solid ${productColor}`;
             background = statusStyle.bg === 'transparent' ? 'transparent' : hexToRgba(statusStyle.bg, BOX_FILL_OPACITY);
           } else {
             border = NEUTRAL_VARIANT_STYLE[style.variant].border;

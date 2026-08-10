@@ -50,20 +50,27 @@ def filter_contained_boxes(
     containment_threshold: float = CONTAINMENT_THRESHOLD,
     iou_threshold: float = NMS_DEFAULT_IOU,
     leftover_coverage_threshold: float = LEFTOVER_COVERAGE_THRESHOLD,
-) -> Tuple[List[Box], List[Box]]:
+) -> Tuple[List[Box], List[Box], List[Tuple[Box, Box]]]:
     """Drop an oversized box B only when every region it swallows already has
     independent coverage from another surviving box - otherwise B is the only
     box representing part of the shelf, so it's kept and flagged instead of
     silently dropped (which would under-count) or silently kept unflagged
     (which would double-count against its swallowed child).
 
-    Returns (kept_boxes, flagged_boxes), where flagged_boxes is always a
-    subset of kept_boxes - never a third disjoint list, and nothing is ever
-    silently dropped except a B whose swallowed regions are all independently
-    covered elsewhere.
+    Returns (kept_boxes, flagged_boxes, flagged_pairs), where flagged_boxes is
+    always a subset of kept_boxes - never a third disjoint list, and nothing
+    is ever silently dropped except a B whose swallowed regions are all
+    independently covered elsewhere.
+
+    flagged_pairs is a (parent, child) tuple for every child box "swallowed"
+    by a flagged parent - one tuple per child, so a parent with multiple
+    children produces multiple pairs. This function doesn't decide which of
+    the two is correct - that requires classify confidence, which doesn't
+    exist yet at this geometry-only stage - it just hands the candidate pairs
+    to the caller (scan.py) to resolve after classification.
     """
     if not boxes:
-        return [], []
+        return [], [], []
 
     def area(box: Box) -> float:
         x1, y1, x2, y2 = box
@@ -71,6 +78,7 @@ def filter_contained_boxes(
 
     kept: List[Box] = []
     flagged: List[Box] = []
+    flagged_pairs: List[Tuple[Box, Box]] = []
     for i, b in enumerate(boxes):
         others = [boxes[j] for j in range(len(boxes)) if j != i]
 
@@ -99,5 +107,20 @@ def filter_contained_boxes(
 
         kept.append(b)
         flagged.append(b)
+        for child in children:
+            flagged_pairs.append((b, child))
 
-    return kept, flagged
+    # A child recorded above can still end up independently dropped by its
+    # OWN loop iteration: a 3+ level nesting chain (grandparent contains
+    # middle contains small) always makes `middle`'s leftover trivially
+    # "covered" by `grandparent` alone (containment_ratio(grandparent,
+    # middle) == 1.0, since middle sits fully inside it) - regardless of
+    # whether middle's own leftover is genuinely covered elsewhere too - so
+    # middle gets dropped as redundant in its own iteration even though
+    # grandparent's (separately computed) children list still names it. Only
+    # kept boxes are real, current detections; scan.py resolves flagged_pairs
+    # by confidence, which requires both boxes to actually still exist.
+    kept_set = set(kept)
+    flagged_pairs = [(parent, child) for parent, child in flagged_pairs if child in kept_set]
+
+    return kept, flagged, flagged_pairs
