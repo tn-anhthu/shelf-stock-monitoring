@@ -1,4 +1,4 @@
-"""Train YOLOv8 nano on a materialized SKU-110K subset.
+"""Fine-tune a YOLO checkpoint (default: YOLOv8n base) on a materialized SKU-110K subset.
 
 Usage: python3 -m src.detection.train.train --n-train 400 --n-val 50 --epochs 8 --name pilot
 """
