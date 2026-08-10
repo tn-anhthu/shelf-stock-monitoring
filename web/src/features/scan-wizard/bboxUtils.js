@@ -15,8 +15,11 @@ export function getBoxStyle(box, quantities) {
   if (box.type === 'gap') {
     return { variant: 'gap' };
   }
-  if (box.excluded_from_count) {
+  if (box.excluded_from_count && box.needs_review) {
     return { variant: 'excluded' };
+  }
+  if (box.excluded_from_count) {
+    return { variant: 'hidden' };
   }
   if (box.is_unknown) {
     return { variant: 'unknown' };

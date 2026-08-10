@@ -58,12 +58,30 @@ describe('getBoxStyle', () => {
     });
   });
 
-  test('marks excluded_from_count boxes as the excluded variant even when also is_unknown', () => {
+  test('marks excluded_from_count + needs_review boxes as the excluded variant even when also is_unknown', () => {
     expect(
       getBoxStyle(
-        { type: 'product', sku_id: 'choco_pie_org', is_unknown: true, excluded_from_count: true },
+        { type: 'product', sku_id: 'choco_pie_org', is_unknown: true, excluded_from_count: true, needs_review: true },
         quantities
       )
     ).toEqual({ variant: 'excluded' });
+  });
+
+  test('marks excluded_from_count boxes without needs_review as the hidden variant', () => {
+    expect(
+      getBoxStyle(
+        { type: 'product', sku_id: 'choco_pie_org', is_unknown: false, excluded_from_count: true, needs_review: false },
+        quantities
+      )
+    ).toEqual({ variant: 'hidden' });
+  });
+
+  test('hidden variant takes priority over is_unknown', () => {
+    expect(
+      getBoxStyle(
+        { type: 'product', sku_id: null, is_unknown: true, excluded_from_count: true, needs_review: false },
+        quantities
+      )
+    ).toEqual({ variant: 'hidden' });
   });
 });
