@@ -19,12 +19,16 @@ FAKE_USAGE = SimpleNamespace(input_tokens=100, output_tokens=20)
 
 class FakeMessages:
     def __init__(self, answer):
+        # answer: string (hành vi cũ, cùng 1 câu trả lời mọi lần gọi) hoặc
+        # list[string] (mới -- trả lần lượt theo thứ tự gọi, dùng để mô
+        # phỏng parent/child khớp 2 SKU khác nhau -- xem test ở Bước 3).
         self.answer = answer
         self.calls = []
 
     def create(self, **kwargs):
         self.calls.append(kwargs)
-        text = json.dumps({"answer": self.answer})
+        current = self.answer[len(self.calls) - 1] if isinstance(self.answer, list) else self.answer
+        text = json.dumps({"answer": current})
         return SimpleNamespace(content=[SimpleNamespace(type="text", text=text)], usage=FAKE_USAGE)
 
 
@@ -307,7 +311,71 @@ def test_run_scan_excludes_lower_confidence_box_of_a_flagged_pair_from_count():
     # Only the higher-confidence (child) box counts toward quantity - the
     # excluded parent isn't silently double-counting the same physical item.
     assert result["quantities"] == {"choco_pie_orion": 1}
+    # Cả 2 box cùng khớp 1 SKU (choco_pie_orion) -- case an toàn, không cần
+    # con người review dù box vẫn bị loại khỏi count.
+    assert child_detection["needs_review"] is False
+    assert parent_detection["needs_review"] is False
 
+
+def test_run_scan_flags_needs_review_when_pair_matches_different_skus():
+    # Cùng hình học với test_run_scan_excludes_lower_confidence_box_of_a_
+    # flagged_pair_from_count ở trên, nhưng lần này parent và child khớp 2 SKU
+    # KHÁC NHAU -- case thật sự nguy hiểm cần con người kiểm tra (xem
+    # docs/superpowers/specs/2026-08-10-hide-same-sku-purple-box-design.md
+    # mục 1, ví dụ thật: OTOKI Kimchi Cay vs Koreno Volcano).
+    child_melon = (20.0, 20.0, 70.0, 150.0)
+    parent_both = (10.0, 20.0, 90.0, 160.0)
+
+    def detect_fn_twin(image):
+        return [child_melon, parent_both]
+
+    def embed_by_crop_size(crop_image):
+        width, height = crop_image.size
+        if width * height < 8000:
+            return np.array([1.0, 0.0])
+        return np.array([0.6, 0.4])
+
+    catalog_items = [
+        {"sku_id": "choco_pie_orion", "name": "Chocopie", "price": 45000, "shelf_full_qty": 10},
+        {"sku_id": "karo_org", "name": "Karo", "price": 30000, "shelf_full_qty": 10},
+    ]
+    # karo_org's embedding is deliberately NOT parallel to parent's crop
+    # vector [0.6, 0.4] (it's [0.5, 0.5], a different direction) so parent's
+    # best-match score comes out < 1.0 and strictly less than child's -- a
+    # real inequality to drive the loser selection, not a tie. Verified by
+    # hand: cosine(child, choco)=1.0, cosine(parent, karo)=0.9806.
+    catalog_embeddings = [
+        ("choco_pie_orion", np.array([1.0, 0.0])),
+        ("karo_org", np.array([0.5, 0.5])),
+    ]
+
+    result = run_scan(
+        image=FAKE_IMAGE,
+        catalog_items=catalog_items,
+        catalog_embeddings=catalog_embeddings,
+        detect_fn=detect_fn_twin,
+        embed_fn=embed_by_crop_size,
+        # 2 câu trả lời, tiêu thụ theo THỨ TỰ GỌI: child (crop nhỏ hơn, được
+        # xử lý trước trong `pending`) nhận "choco_pie_orion", parent nhận
+        # "karo_org". max_workers=1 bên dưới bắt buộc thứ tự gọi LLM đúng
+        # thứ tự submit (xem comment ở tham số đó) -- nếu không, 2 luồng có
+        # thể gọi song song và đảo thứ tự tiêu thụ list này.
+        llm_client=FakeLLMClient(answer=["choco_pie_orion", "karo_org"]),
+        max_workers=1,
+    )
+
+    assert result["boxes"] == [child_melon, parent_both]
+    child_detection, parent_detection = result["detections"]
+    assert child_detection["sku_id"] == "choco_pie_orion"
+    assert parent_detection["sku_id"] == "karo_org"
+    assert child_detection["confidence"] == 1.0
+    assert parent_detection["confidence"] < 1.0
+    # parent thua (confidence thấp hơn) -- bị loại khỏi count, VÀ vì SKU khác
+    # child nên cần con người review.
+    assert parent_detection["excluded_from_count"] is True
+    assert parent_detection["needs_review"] is True
+    assert child_detection["excluded_from_count"] is False
+    assert child_detection["needs_review"] is False
 
 
 def test_run_scan_includes_gaps_from_detected_boxes():
@@ -385,7 +453,7 @@ def test_run_scan_skips_embed_and_classify_for_degenerate_crop():
     )
 
     assert result["detections"] == [
-        {"sku_id": None, "confidence": 0.0, "depth": 1, "excluded_from_count": False}
+        {"sku_id": None, "confidence": 0.0, "depth": 1, "excluded_from_count": False, "needs_review": False}
     ]
     assert embed_calls == []
     assert llm_client.messages.calls == []

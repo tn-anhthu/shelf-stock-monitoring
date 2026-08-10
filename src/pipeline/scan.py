@@ -140,7 +140,13 @@ def run_scan(
         depth = depth_by_index.get(i, 1)
         cropped = crop_box(image, box)
         if cropped is None:
-            detections[i] = {"sku_id": None, "confidence": 0.0, "depth": depth, "excluded_from_count": False}
+            detections[i] = {
+                "sku_id": None,
+                "confidence": 0.0,
+                "depth": depth,
+                "excluded_from_count": False,
+                "needs_review": False,
+            }
             continue
 
         # embed_fn(PIL.Image) -> np.ndarray — same contract as
@@ -167,7 +173,13 @@ def run_scan(
     # (token cost tracking) is aggregated there too; neither is persisted to
     # scan_history/inventory.
     for (i, depth, _, _), (sku_id, score, _reasoning, _usage, _ranked) in zip(pending, llm_results):
-        detections[i] = {"sku_id": sku_id, "confidence": score, "depth": depth, "excluded_from_count": False}
+        detections[i] = {
+            "sku_id": sku_id,
+            "confidence": score,
+            "depth": depth,
+            "excluded_from_count": False,
+            "needs_review": False,
+        }
 
     # filter_contained_boxes flags NEEDS REVIEW pairs at the geometry level,
     # before classify has run - it can't know which of the two represents the
@@ -182,8 +194,18 @@ def run_scan(
         # full-package box is usually a more complete representation) - ties
         # are effectively never hit with real (float) confidence scores, so
         # this is just a deterministic tie-break, not a load-bearing assumption.
-        loser_i = child_i if detections[child_i]["confidence"] <= detections[parent_i]["confidence"] else parent_i
+        if detections[child_i]["confidence"] <= detections[parent_i]["confidence"]:
+            loser_i, winner_i = child_i, parent_i
+        else:
+            loser_i, winner_i = parent_i, child_i
         detections[loser_i]["excluded_from_count"] = True
+        # needs_review is only True when the excluded box's SKU actually
+        # disagrees with the surviving box's SKU (see
+        # docs/superpowers/specs/2026-08-10-hide-same-sku-purple-box-design.md)
+        # -- the common case (both boxes agree on the same SKU, e.g. a
+        # package photo + its own printed mascot both matching the same
+        # product) doesn't need a human to look at it.
+        detections[loser_i]["needs_review"] = detections[loser_i]["sku_id"] != detections[winner_i]["sku_id"]
 
     low_confidence = is_low_confidence(detections, threshold=CONFIDENCE_THRESHOLD)
 
