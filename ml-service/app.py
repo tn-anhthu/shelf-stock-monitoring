@@ -28,7 +28,7 @@ from src.pipeline.scan import run_scan
 load_dotenv()
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-WEIGHTS_PATH = REPO_ROOT / "runs/detect/runs/train_1a/n_2000/weights/best.pt"
+WEIGHTS_PATH = REPO_ROOT / "sku110k_yolo26n_results/weights/best.pt"
 DB_PATH = REPO_ROOT / "data/shelfsense.db"
 IMAGES_DIR = REPO_ROOT / "data/catalog/images"
 

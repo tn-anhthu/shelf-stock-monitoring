@@ -1,6 +1,10 @@
-"""Wrapper around the YOLOv8 nano checkpoint fine-tuned in this sprint (Task 5's
-runs/train_1a/full/weights/best.pt), matching the detect_1b/detect_1c interface used
-by src/detection/benchmark/report.py so it plugs into the existing eval/metrics code.
+"""Wrapper around the YOLO26n nano checkpoint fine-tuned on the full SKU-110K
+dataset (sku110k_yolo26n_results/weights/best.pt), matching the detect_1b/detect_1c
+interface used by src/detection/benchmark/report.py so it plugs into the existing
+eval/metrics code.
+
+device="mps" is confirmed safe for YOLO26n (no CPU fallback needed) — see Task 1
+of docs/superpowers/plans/2026-08-10-yolo26n-migration.md for the smoke test.
 """
 from pathlib import Path
 from typing import List
