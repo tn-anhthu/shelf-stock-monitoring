@@ -185,8 +185,11 @@ def run_scan(
     # before classify has run - it can't know which of the two represents the
     # same physical item more reliably. Now that detections carry confidence,
     # resolve each pair here: keep the higher-confidence box in the count,
-    # exclude the other (still shown on the UI, never deleted - see
-    # docs/superpowers/specs/2026-08-05-same-item-dedup-design.md).
+    # exclude the other. The excluded box is still kept in `detections` (never
+    # deleted), but the UI now only draws it (a purple "needs review" border)
+    # when needs_review is True; a same-SKU excluded box is hidden from the
+    # overlay entirely - see
+    # docs/superpowers/specs/2026-08-10-hide-same-sku-purple-box-design.md.
     box_position = {box: i for i, box in enumerate(boxes)}
     for parent, child in flagged_pairs:
         parent_i, child_i = box_position[parent], box_position[child]
@@ -204,8 +207,16 @@ def run_scan(
         # docs/superpowers/specs/2026-08-10-hide-same-sku-purple-box-design.md)
         # -- the common case (both boxes agree on the same SKU, e.g. a
         # package photo + its own printed mascot both matching the same
-        # product) doesn't need a human to look at it.
-        detections[loser_i]["needs_review"] = detections[loser_i]["sku_id"] != detections[winner_i]["sku_id"]
+        # product) doesn't need a human to look at it. OR'd (not overwritten)
+        # against any prior value: filter_contained_boxes can emit multiple
+        # pairs naming the same parent (one per swallowed child), so a box
+        # already flagged True by an earlier pair must stay True even if a
+        # later pair agrees on SKU - otherwise that later pair would silently
+        # erase a real conflict already found.
+        detections[loser_i]["needs_review"] = (
+            detections[loser_i]["needs_review"]
+            or detections[loser_i]["sku_id"] != detections[winner_i]["sku_id"]
+        )
 
     low_confidence = is_low_confidence(detections, threshold=CONFIDENCE_THRESHOLD)
 

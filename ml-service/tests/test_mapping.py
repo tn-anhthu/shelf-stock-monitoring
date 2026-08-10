@@ -87,9 +87,11 @@ def test_maps_gap_boxes_with_no_sku_and_continues_box_id_sequence():
 def test_maps_excluded_from_count_flag_from_detection_onto_product_box():
     # scan.py sets excluded_from_count on the lower-confidence box of a
     # NEEDS REVIEW parent/child pair (see src/pipeline/scan.py's flagged_pairs
-    # handling) - the API response must surface it so the UI can show the box
-    # (not hide it) while excluding it from the count. See
-    # docs/superpowers/specs/2026-08-05-same-item-dedup-design.md section 4.
+    # handling) - the API response must surface it so the frontend can decide
+    # how to render the box: a purple "needs review" border when needs_review
+    # is also True, or hidden entirely when the pair agreed on the same SKU.
+    # See docs/superpowers/specs/2026-08-05-same-item-dedup-design.md section 4
+    # and docs/superpowers/specs/2026-08-10-hide-same-sku-purple-box-design.md.
     scan_result = {
         "boxes": [(10, 10, 110, 210)],
         "detections": [{"sku_id": "choco_pie_org", "confidence": 0.57, "depth": 1, "excluded_from_count": True}],

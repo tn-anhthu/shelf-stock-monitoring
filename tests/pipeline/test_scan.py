@@ -378,6 +378,88 @@ def test_run_scan_flags_needs_review_when_pair_matches_different_skus():
     assert child_detection["needs_review"] is False
 
 
+def test_run_scan_keeps_needs_review_true_when_a_later_pair_agrees_on_sku():
+    # Regression test for a bug found in final whole-branch review: a single
+    # oversized parent box can swallow TWO children (filter_contained_boxes
+    # emits one flagged_pair per child - see its docstring), so the
+    # flagged_pairs loop in run_scan touches the SAME parent detection twice.
+    # If needs_review is a plain overwrite (not OR-accumulated), a parent that
+    # genuinely disagrees with child1's SKU (pair 1 -> needs_review=True) but
+    # happens to agree with child2's SKU (pair 2, processed after) would have
+    # its True silently reset to False by pair 2 - erasing a real conflict the
+    # frontend now depends on (excluded_from_count=True + needs_review=False
+    # is hidden entirely, not shown with a neutral border). See
+    # docs/superpowers/specs/2026-08-10-hide-same-sku-purple-box-design.md.
+    #
+    # Geometry: parent fully swallows two non-overlapping children of
+    # different sizes (so filter_anomalous_boxes/merge_adjacent_fragments
+    # leave all 3 untouched and filter_contained_boxes flags parent against
+    # BOTH, in this order - confirmed directly against filter_contained_boxes
+    # before wiring this test):
+    #   flagged_pairs == [(parent, child1), (parent, child2)]
+    #   boxes (post-filter, row-sorted by y-center) == [child1, parent, child2]
+    child1 = (20.0, 20.0, 70.0, 70.0)  # 50x50, y-center 45 -> sorted first
+    parent = (10.0, 10.0, 190.0, 190.0)  # 180x180, y-center 100 -> sorted second
+    child2 = (100.0, 100.0, 160.0, 160.0)  # 60x60, y-center 130 -> sorted third
+
+    def detect_fn_triplet(image):
+        return [child1, child2, parent]
+
+    def embed_by_crop_size(crop_image):
+        # child1's crop is 50*50=2500px, child2's is 60*60=3600px, parent's is
+        # 180*180=32400px - three distinct buckets, each pointing at a
+        # different direction so each box gets a real, distinct embedding.
+        width, height = crop_image.size
+        area = width * height
+        if area <= 2500:
+            return np.array([1.0, 0.0])  # child1 -> points straight at sku_a
+        if area <= 5000:
+            return np.array([0.0, 1.0])  # child2 -> points straight at sku_b
+        return np.array([0.6, 0.8])  # parent -> mixed, weaker match to both
+
+    catalog_items = [
+        {"sku_id": "sku_a", "name": "SKU A", "price": 10000, "shelf_full_qty": 10},
+        {"sku_id": "sku_b", "name": "SKU B", "price": 10000, "shelf_full_qty": 10},
+    ]
+    catalog_embeddings = [
+        ("sku_a", np.array([1.0, 0.0])),
+        ("sku_b", np.array([0.0, 1.0])),
+    ]
+
+    result = run_scan(
+        image=FAKE_IMAGE,
+        catalog_items=catalog_items,
+        catalog_embeddings=catalog_embeddings,
+        detect_fn=detect_fn_triplet,
+        embed_fn=embed_by_crop_size,
+        # 3 answers, consumed in LLM call order. max_workers=1 forces that
+        # order to match submission order (same reasoning as the test above).
+        # Boxes reach classify in row-sorted order [child1, parent, child2]:
+        #   child1 -> "sku_a" (cosine 1.0 against its own embedding)
+        #   parent -> "sku_b" (cosine 0.8, its higher-scoring candidate)
+        #   child2 -> "sku_b" (cosine 1.0 against its own embedding)
+        llm_client=FakeLLMClient(answer=["sku_a", "sku_b", "sku_b"]),
+        max_workers=1,
+    )
+
+    assert result["boxes"] == [child1, parent, child2]
+    child1_detection, parent_detection, child2_detection = result["detections"]
+    assert child1_detection["sku_id"] == "sku_a"
+    assert parent_detection["sku_id"] == "sku_b"
+    assert child2_detection["sku_id"] == "sku_b"
+    # Parent's confidence (0.8, matched to sku_b) loses to BOTH children's
+    # (1.0 each) - so parent is excluded by both pairs.
+    assert child1_detection["confidence"] == 1.0
+    assert child2_detection["confidence"] == 1.0
+    assert parent_detection["confidence"] == 0.8
+    assert parent_detection["excluded_from_count"] is True
+    # Pair 1 (parent vs child1): different SKUs (sku_b vs sku_a) -> a real
+    # conflict, needs_review must be True. Pair 2 (parent vs child2): same
+    # SKU (sku_b vs sku_b) -> on its own would set needs_review False. The
+    # fix accumulates with OR, so the True from pair 1 must survive pair 2.
+    assert parent_detection["needs_review"] is True
+
+
 def test_run_scan_includes_gaps_from_detected_boxes():
     catalog_items = [
         {"sku_id": "choco_pie_orion", "name": "Chocopie", "price": 45000, "shelf_full_qty": 10},
