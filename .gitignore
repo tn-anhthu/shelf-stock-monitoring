@@ -43,6 +43,7 @@ data/scan_viz/*
 
 # Dev tooling (local-only)
 .claude/worktrees/
+.worktrees/
 docs/superpowers/
 .superpowers/
 
