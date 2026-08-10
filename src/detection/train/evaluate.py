@@ -1,7 +1,7 @@
 """Evaluate the fine-tuned 1a model on the same 50-image SKU-110K eval set used for
 1b/1c, for a direct, apples-to-apples comparison.
 
-Usage: python3 -m src.detection.train.evaluate --weights runs/train_1a/full/weights/best.pt
+Usage: python3 -m src.detection.train.evaluate --weights sku110k_yolo26n_results/weights/best.pt
 """
 import argparse
 import json

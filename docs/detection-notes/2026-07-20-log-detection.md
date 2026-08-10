@@ -1,5 +1,9 @@
 # Nhật ký Detection (Phase 1)
 
+> **Superseded 2026-08-10:** production checkpoint moved from YOLOv8n (`n_2000`) to
+> YOLO26n — see `docs/superpowers/plans/2026-08-10-yolo26n-migration.md`. The
+> checkpoint path/metrics below are historical (YOLOv8n-era), left unedited.
+
 **Trạng thái hiện tại:** checkpoint đang dùng là `runs/train_1a/n_2000/weights/best.pt`
 (YOLOv8 nano, train trên 2000 ảnh) — **precision=0.758, recall=0.818**, đo trên bộ eval
 cố định 50 ảnh (`Voxel51/sku110k_test`, IoU=0.5) qua `src.detection.train.evaluate`. Đạt

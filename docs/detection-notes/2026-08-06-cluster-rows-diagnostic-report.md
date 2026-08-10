@@ -1,5 +1,10 @@
 # Diagnostic Report: cluster_rows chaining fix — visual/mechanical evidence for human decision
 
+> **Superseded 2026-08-10:** the `runs/detect/runs/train_1a/n_2000/weights/best.pt`
+> checkpoint referenced throughout this report's methodology has been replaced by
+> YOLO26n — see `docs/superpowers/plans/2026-08-10-yolo26n-migration.md`. This report
+> is left as an unedited historical record of the row-clustering investigation.
+
 > **Archived as written on 06/08/2026, TRƯỚC khi revert.** "Currently committed", "hiện tại", hay
 > các cụm tương tự trong báo cáo này đều chỉ trạng thái tại thời điểm viết (commit `4a9ffed`,
 > thuật toán row-mean + span-cap) — KHÔNG phải trạng thái hiện tại của `row_clustering.py`. File
