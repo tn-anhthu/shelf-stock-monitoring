@@ -123,6 +123,14 @@ CONFIDENCE_THRESHOLD = 0.5
 # jump at 74.5px (+51.07px above calibrated, matching the "~51px" cited above)
 # and test1's at 24.5px (+5.55px, matching "~5.6px above").
 ROW_CLUSTER_TOLERANCE_RATIO = 0.043050
+# Re-calibrated 2026-08-10 via scripts/calibrate_adaptive_tolerances.py against
+# sku110k_yolo26n_results/weights/best.pt (YOLO26n) — the checkpoint
+# ml-service/app.py now serves after the YOLOv8n->YOLO26n migration. The
+# YOLO26n chapter is at the bottom of this block; the paragraphs below are the
+# retained history of the n_2000 calibration, kept because they document *why*
+# a margin measured against one checkpoint's box positions can't be assumed to
+# transfer to another's.
+#
 # Includes a 0.67 safety margin below the raw pooled-median ratio (0.012950).
 # At test3's n_2000 scale this lands y_gap_tolerance at ~4.51px. Re-verified
 # the same way as ROW_CLUSTER_TOLERANCE_RATIO above, but against real
