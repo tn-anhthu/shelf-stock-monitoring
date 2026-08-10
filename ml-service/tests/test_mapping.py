@@ -27,6 +27,7 @@ def test_maps_known_product_box():
             "confidence": 0.94,
             "is_unknown": False,
             "excluded_from_count": False,
+            "needs_review": False,
         }
     ]
     assert result["warnings"] == {"low_confidence_regions": [], "edge_crop_regions": [], "blur_detected": False}
@@ -51,6 +52,7 @@ def test_maps_unknown_product_box_into_low_confidence_regions():
             "confidence": 0.55,
             "is_unknown": True,
             "excluded_from_count": False,
+            "needs_review": False,
         }
     ]
     assert result["warnings"]["low_confidence_regions"] == ["b0"]
@@ -76,6 +78,8 @@ def test_maps_gap_boxes_with_no_sku_and_continues_box_id_sequence():
     }
     # gap boxes never get an excluded_from_count field - they're not products
     assert "excluded_from_count" not in result["boxes"][1]
+    # gap boxes never get a needs_review field either - they're not products
+    assert "needs_review" not in result["boxes"][1]
     # gap boxes never count toward low_confidence_regions
     assert result["warnings"]["low_confidence_regions"] == []
 
@@ -111,3 +115,28 @@ def test_multiple_products_get_sequential_box_ids():
 
     assert [b["box_id"] for b in result["boxes"]] == ["b0", "b1"]
     assert [b["sku_id"] for b in result["boxes"]] == ["choco_pie_org", "karo_org"]
+
+
+def test_maps_needs_review_flag_from_detection_onto_product_box():
+    # scan.py sets needs_review on the excluded box of a flagged pair only
+    # when it disagrees with the surviving box's SKU (see
+    # docs/superpowers/specs/2026-08-10-hide-same-sku-purple-box-design.md
+    # section 3) - the API response must surface it so the FE knows whether
+    # to draw the purple "needs review" border or hide the box entirely.
+    scan_result = {
+        "boxes": [(10, 10, 110, 210)],
+        "detections": [
+            {
+                "sku_id": "choco_pie_org",
+                "confidence": 0.57,
+                "depth": 1,
+                "excluded_from_count": True,
+                "needs_review": True,
+            }
+        ],
+        "gaps": [],
+    }
+
+    result = map_scan_result_to_response(scan_result, CATALOG_ITEMS, image_width=1200, image_height=900)
+
+    assert result["boxes"][0]["needs_review"] is True

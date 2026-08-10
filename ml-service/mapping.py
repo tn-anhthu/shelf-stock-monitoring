@@ -37,6 +37,7 @@ def map_scan_result_to_response(
                 "confidence": detection["confidence"],
                 "is_unknown": is_unknown,
                 "excluded_from_count": detection.get("excluded_from_count", False),
+                "needs_review": detection.get("needs_review", False),
             }
         )
         if is_unknown:
