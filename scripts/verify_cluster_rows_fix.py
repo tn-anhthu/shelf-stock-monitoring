@@ -171,7 +171,11 @@ def main():
             continue
 
         boxes_anom = filter_anomalous_boxes(boxes_merged, row_cluster_tolerance=row_cluster_tolerance)
-        boxes_final, flagged_regions = filter_contained_boxes(boxes_anom)
+        # filter_contained_boxes returns (kept, flagged, flagged_pairs) -- the third
+        # element was added when scan.py started resolving parent/child dedup pairs
+        # after classification. This geometry-only tool never classifies, so it has
+        # nothing to resolve them with and deliberately ignores them.
+        boxes_final, flagged_regions, _flagged_pairs = filter_contained_boxes(boxes_anom)
         gaps = detect_gaps(boxes_final, row_cluster_tolerance=row_cluster_tolerance)
 
         print(f"\n=== {image_path} ===")

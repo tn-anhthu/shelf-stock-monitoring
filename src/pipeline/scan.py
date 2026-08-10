@@ -25,6 +25,14 @@ from src.pipeline.gap_detection import detect_gaps
 
 CONFIDENCE_THRESHOLD = 0.5
 
+# Re-calibrated 2026-08-10 via scripts/calibrate_adaptive_tolerances.py against
+# sku110k_yolo26n_results/weights/best.pt (YOLO26n) — the checkpoint
+# ml-service/app.py now serves after the YOLOv8n->YOLO26n migration. The
+# YOLO26n chapter is at the bottom of this block; the two paragraphs below are
+# the retained history of the `full` -> `n_2000` calibrations, kept because
+# they document *why* a margin measured against one checkpoint's box positions
+# can't be assumed to transfer to another's.
+#
 # Calibrated 2026-08-04 via scripts/calibrate_adaptive_tolerances.py against
 # runs/detect/runs/train_1a/n_2000/weights/best.pt — the official checkpoint
 # per docs/detection-notes/detection-log.md's "Quyết định cuối cùng" — on the
@@ -64,7 +72,42 @@ CONFIDENCE_THRESHOLD = 0.5
 # boxes per image, not a sign of approaching danger. Distance to the
 # *nearest* flip of any kind is not a meaningful safety metric here; distance
 # to the nearest *severe* one is.)
-ROW_CLUSTER_TOLERANCE_RATIO = 0.045065
+#
+# --- YOLO26n chapter (2026-08-10) ---
+# Re-measured from scratch against real YOLO26n detections, same methodology,
+# because the migration changed both box scale and box *count*:
+#
+#     image   n_2000 boxes / median h      YOLO26n boxes / median h
+#     test1   60 / 420.5px                 56 / 435.7px
+#     test2   95 / 344.8px                 88 / 340.3px
+#     test3   54 / 519.9px                 37 / 566.9px   <- -31% boxes, +9.0% scale
+#     test4   39 / 711.5px                 39 / 715.7px
+#     test5   60 / 293.2px                 51 / 302.9px
+#     pooled  308 / 386.1px                271 / 404.2px  <- +4.7% scale
+#
+# The pooled median moved only +4.7%, which on its own would have justified
+# light-touch verification. The full re-sweep was done anyway because test3 —
+# the single image both danger zones were originally measured on — lost 31% of
+# its boxes. The danger boundary is a function of box *positions*, not of the
+# pooled median, so a 4.7% pooled shift is not evidence that the boundary
+# stayed put when a third of that image's boxes disappeared.
+#
+# New raw ratio 20.0 / 404.2 = 0.049482, times the same 0.87 margin = 0.043050.
+# Sweeping row_cluster_tolerance 1.0-120.0px in 0.5px steps against real
+# cluster_rows() on YOLO26n's post-merge boxes, looking for the same severe
+# signature (max row size jumping 3+ boxes in one step): **no severe jump
+# occurs above the calibrated tolerance on any of the 5 images, anywhere up to
+# 120px.** That is strictly safer than n_2000, whose tightest margin was test1
+# at only +5.55px (jump at 24.5px vs 18.95px calibrated). YOLO26n's remaining
+# jumps all sit *below* the calibrated tolerance (test1 5.5px and 16.0px,
+# test2 9.0px, test3 11.5px, test4 4.0px and 11.5px) — those are already
+# passed through in normal operation and are not a boundary being approached.
+#
+# The sweep harness was validated before being trusted: re-run against n_2000's
+# cached detections it reproduces this block's own historical numbers — test3's
+# jump at 74.5px (+51.07px above calibrated, matching the "~51px" cited above)
+# and test1's at 24.5px (+5.55px, matching "~5.6px above").
+ROW_CLUSTER_TOLERANCE_RATIO = 0.043050
 # Includes a 0.67 safety margin below the raw pooled-median ratio (0.012950).
 # At test3's n_2000 scale this lands y_gap_tolerance at ~4.51px. Re-verified
 # the same way as ROW_CLUSTER_TOLERANCE_RATIO above, but against real
@@ -86,7 +129,43 @@ ROW_CLUSTER_TOLERANCE_RATIO = 0.045065
 # tests/pipeline/test_box_merge.py::test_merge_adjacent_fragments_merges_real_measured_split_case
 # measured y_gap=-1.7, i.e. the fragments actually overlap in y — so there's
 # no meaningful floor pushing this ratio up.)
-Y_GAP_TOLERANCE_RATIO = 0.008676
+#
+# --- YOLO26n chapter (2026-08-10) ---
+# New raw ratio 5.0 / 404.2 = 0.012371, times the same 0.67 margin = 0.008288.
+# Re-swept 0.5-150.0px in 0.1px steps against real merge_adjacent_fragments()
+# on YOLO26n's detections, looking for the first tolerance at which ANY merge
+# fires. Calibrated tolerance vs first merge event, per image:
+#
+#     test1  3.61px calibrated  ->  first merge 13.0px   (+9.39px)
+#     test2  2.82px calibrated  ->  first merge  6.0px   (+3.18px)  <- tightest
+#     test3  4.70px calibrated  ->  first merge 26.8px   (+22.10px)
+#     test4  5.93px calibrated  ->  no merge anywhere <=150px
+#     test5  2.51px calibrated  ->  no merge anywhere <=150px
+#
+# The tightest margin (test2, +3.18px) is marginally better than n_2000's
+# equivalent (+3.41px at 2.99px calibrated vs a 6.4px first merge — same image,
+# same binding constraint), so the migration does not tighten this bound.
+#
+# On the historical Yakult case: the ~5.1px stacked-5-pack gap described above
+# does not reproduce under YOLO26n, just as it no longer reproduced under
+# n_2000. test3's tightest merge-*eligible* pair (x-overlap >=0.8 AND at least
+# one box aspect-anomalous, i.e. all three conditions merge_adjacent_fragments
+# actually requires) is 26.75px under YOLO26n and 38.15px under n_2000. In the
+# region the old bug was found in (600,2400,1150,2850), n_2000 emitted 5
+# heavily mutually-overlapping boxes where YOLO26n emits 1 — consistent with
+# the migration's "fewer boxes = fewer duplicates" expectation rather than lost
+# detections. test3 does contain a 1.43px-gap pair at the left image edge
+# (x≈0-120), but both of its boxes have normal aspect ratio, so the
+# aspect-anomaly condition rejects it at every tolerance — it can never merge.
+#
+# Note on why these constants moved at all: the *previous* values (0.045065 /
+# 0.008676) were re-swept against YOLO26n's boxes too and are also safe (no
+# severe row jump anywhere; test2 y-gap margin +3.05px). They were updated not
+# to fix a live hazard but to keep the constants reproducible from the
+# checkpoint actually deployed — leaving ratios derived from one checkpoint's
+# pooled median in place while serving another is precisely the `full`-vs-
+# `n_2000` mix-up documented at the top of this block.
+Y_GAP_TOLERANCE_RATIO = 0.008288
 
 
 def adaptive_tolerances(boxes: List[Box]) -> Tuple[float, float]:
