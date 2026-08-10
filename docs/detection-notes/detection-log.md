@@ -1,8 +1,17 @@
 # Nhật ký Detection (Phase 1)
 
 > **Superseded 2026-08-10:** production checkpoint moved from YOLOv8n (`n_2000`) to
-> YOLO26n — see `docs/superpowers/plans/2026-08-10-yolo26n-migration.md`. The
-> checkpoint path/metrics below are historical (YOLOv8n-era), left unedited.
+> YOLO26n — see `docs/superpowers/plans/2026-08-10-yolo26n-migration.md` (gitignored,
+> local-only; not available in a fresh clone). The checkpoint path/metrics below are
+> historical (YOLOv8n-era), left unedited.
+>
+> **Current production checkpoint:** YOLO26n fine-tuned on the *full* SKU-110K train
+> split (8219 images, 30 epochs, `patience=5`), expected locally at
+> `sku110k_yolo26n_results/weights/best.pt` — this is what `ml-service/app.py`'s
+> `WEIGHTS_PATH` points at. That directory is gitignored (like `runs/` was for the
+> old checkpoint), so it isn't in the repo; obtain/reproduce it by re-running the
+> training notebook `yolo26n-on-sku-110k.ipynb` (Kaggle GPU, `yolo26n.pt` base) —
+> that notebook is itself not yet committed to git as of this note.
 
 **Trạng thái hiện tại:** checkpoint đang dùng là `runs/train_1a/n_2000/weights/best.pt` (YOLOv8 nano, train trên 2000 ảnh) — **precision=0.758, recall=0.818**, đo trên bộ eval cố định 50 ảnh (`Voxel51/sku110k_test`, IoU=0.5) qua `src.detection.train.evaluate`. Đạt
 ngưỡng recall ≥ 0.6 đã quyết định ban đầu.

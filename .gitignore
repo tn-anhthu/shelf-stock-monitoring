@@ -21,6 +21,7 @@ __pycache__/
 *.log
 *.pptx
 runs/
+sku110k_yolo26n_results/
 
 # Data — output pipeline sinh ra, giữ lại input gốc/ground-truth
 data/*.db
