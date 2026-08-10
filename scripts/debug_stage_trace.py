@@ -16,7 +16,7 @@ Usage:
     # Region-scoped (verbose per-stage box listing + crops), when you already
     # know roughly where the suspicious box is:
     python3 scripts/debug_stage_trace.py --image path/to/shelf.jpg \
-        --weights runs/detect/runs/train_1a/n_2000/weights/best.pt \
+        --weights sku110k_yolo26n_results/weights/best.pt \
         --region 600,2400,1150,2850 \
         --out data/scan_viz/test1_stage_trace
 
@@ -24,7 +24,7 @@ Usage:
     # NEEDS REVIEW box's raw-YOLO provenance + a saved crop of each, since you
     # don't know in advance where (or whether) any flagged boxes are:
     python3 scripts/debug_stage_trace.py --image path/to/shelf.jpg \
-        --weights runs/detect/runs/train_1a/n_2000/weights/best.pt \
+        --weights sku110k_yolo26n_results/weights/best.pt \
         --out data/scan_viz/test2_stage_trace
 """
 import argparse
@@ -85,7 +85,12 @@ def main():
     boxes_raw = detect_1a(yolo_model, shelf_image)
     boxes_merged = merge_adjacent_fragments(boxes_raw)
     boxes_anom = filter_anomalous_boxes(boxes_merged)
-    boxes_final, flagged = filter_contained_boxes(boxes_anom)
+    # filter_contained_boxes returns (kept, flagged, flagged_pairs) -- the third
+    # element was added when scan.py started resolving parent/child dedup pairs
+    # after classification. This script never classifies, so it has nothing to
+    # resolve them with and deliberately ignores them (same pattern as
+    # scripts/verify_cluster_rows_fix.py).
+    boxes_final, flagged, _flagged_pairs = filter_contained_boxes(boxes_anom)
 
     if whole_image_mode:
         print(f"1. raw YOLO (detect_1a): {len(boxes_raw)} box(es)")

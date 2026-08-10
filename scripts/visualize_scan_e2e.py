@@ -17,13 +17,13 @@ intermediate artifact so each pipeline stage is inspectable:
 
 Usage:
     python3 scripts/visualize_scan_e2e.py --image path/to/shelf.jpg \
-        --weights runs/detect/runs/train_1a/n_2000/weights/best.pt \
+        --weights sku110k_yolo26n_results/weights/best.pt \
         --out data/scan_viz/run1
 
 Must run on the M4 MacBook Pro (needs mps + network access for the SigLIP2
-download) — the checkpoint path above matches what's actually on disk today
-(nested runs/detect/runs/train_1a/..., not runs/train_1a/... as written in some
-earlier notes; run `find runs -iname best.pt` to confirm before running).
+download) — the checkpoint path above is the YOLO26n checkpoint's location on
+disk today (top-level sku110k_yolo26n_results/, not under runs/ like the
+retired YOLOv8n checkpoint was); confirm it's still current before running.
 
 Provider is picked by the LLM_PROVIDER env var (anthropic | gemini, default
 anthropic -- same switch as src/pipeline/classify.py's _escalate). The

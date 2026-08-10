@@ -17,7 +17,7 @@ the tolerance scales with however "zoomed in" any given photo is:
 
 Usage:
     python3 scripts/calibrate_adaptive_tolerances.py \
-        --weights runs/detect/runs/train_1a/n_2000/weights/best.pt
+        --weights sku110k_yolo26n_results/weights/best.pt
 """
 import argparse
 import statistics

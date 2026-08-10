@@ -10,7 +10,7 @@ instead of guessed at:
 
 Usage:
     python3 scripts/debug_gap_detection.py --image path/to/shelf.jpg \
-        --weights runs/detect/runs/train_1a/n_2000/weights/best.pt \
+        --weights sku110k_yolo26n_results/weights/best.pt \
         --row-tolerance 20.0 --width-multiplier 1.5
 """
 import argparse

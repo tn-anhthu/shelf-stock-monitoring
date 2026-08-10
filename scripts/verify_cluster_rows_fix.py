@@ -30,11 +30,11 @@ It prints, per image:
 Usage:
     # Full run across all 5 raw calibration images, no region check, no image output:
     python3 scripts/verify_cluster_rows_fix.py \\
-        --weights runs/detect/runs/train_1a/n_2000/weights/best.pt
+        --weights sku110k_yolo26n_results/weights/best.pt
 
     # Single image + save an annotated image to eyeball boxes/gaps directly:
     python3 scripts/verify_cluster_rows_fix.py \\
-        --weights runs/detect/runs/train_1a/n_2000/weights/best.pt \\
+        --weights sku110k_yolo26n_results/weights/best.pt \\
         --image data/scan_viz/input/test3.HEIC \\
         --out data/scan_viz/test3_geometry_only
 
@@ -42,7 +42,7 @@ Usage:
     # phantom gap (repeat --check-region for more than one; x1,y1,x2,y2 in
     # that image's raw pixel coordinates):
     python3 scripts/verify_cluster_rows_fix.py \\
-        --weights runs/detect/runs/train_1a/n_2000/weights/best.pt \\
+        --weights sku110k_yolo26n_results/weights/best.pt \\
         --image data/scan_viz/input/test3.HEIC \\
         --check-region 600,2400,1150,2850
 

@@ -7,7 +7,7 @@ export it yourself before running, or put it in a .env file (ANTHROPIC_API_KEY=.
 gitignored) and it's auto-loaded via python-dotenv if that package is
 installed. Never hardcode the key into this or any other file.
 
-Usage: python3 scripts/run_scan_e2e.py --image path/to/shelf.jpg --weights runs/train_1a/full/weights/best.pt
+Usage: python3 scripts/run_scan_e2e.py --image path/to/shelf.jpg --weights sku110k_yolo26n_results/weights/best.pt
 """
 import argparse
 import json
