@@ -1,4 +1,4 @@
-# ROI-crop (CLIPSeg) threshold benchmark — 2026-07-28
+# ROI-crop (CLIPSeg) threshold benchmark: 2026-07-28
 
 ## Phương pháp
 
@@ -6,10 +6,10 @@ Không đoán ngưỡng. Đo trên 5 ảnh demo gốc (`data/scan_viz/input/test
 
 1. Ground truth ROI mỗi ảnh = bounding box của crop tay (`input_crop/test{n}_crop.HEIC`)
    định vị lại trong ảnh gốc bằng template matching (`cv2.matchTemplate`, match
-   confidence 0.91–1.00 cho cả 5 ảnh — xem `GROUND_TRUTH` trong script benchmark).
+   confidence 0.91–1.00 cho cả 5 ảnh, xem `GROUND_TRUTH` trong script benchmark).
 2. Chạy CLIPSeg (`CIDAS/clipseg-rd64-refined`) 1 lần/ảnh cho keep-prompts
    (`product`, `store shelf`, `shelf edge`) và exclude-prompts (`floor`, `ceiling`,
-   `person`, `empty aisle background`), cache probability map — sweep threshold
+   `person`, `empty aisle background`), cache probability map, sweep threshold
    trên map đã cache (không chạy lại model mỗi threshold).
 3. Với mỗi threshold trong {0.30..0.70, bước 0.05}: `combine_keep_exclude` → mask
    → `largest_connected_component_bbox` (min_area_ratio=0.05) → so IoU với ground
@@ -31,7 +31,7 @@ Không đoán ngưỡng. Đo trên 5 ảnh demo gốc (`data/scan_viz/input/test
 
 **Chọn threshold = 0.55**: avg IoU cao nhất (0.795), fallback rate 0/5. Từ 0.60 trở
 lên, IoU tiếp tục tăng ở test2/test4 (kệ chụp thẳng, ít phối cảnh) nhưng sập mạnh ở
-test1/test5 (kệ chụp nghiêng góc rộng — connected component co lại quá nhỏ, mất cả
+test1/test5 (kệ chụp nghiêng góc rộng, connected component co lại quá nhỏ, mất cả
 phần kệ thật ở rìa) và 0.70 gây fallback hẳn ở test1 (mask dưới ngưỡng diện tích tối
 thiểu). 0.55 là điểm cân bằng tốt nhất đo được, không phải số đoán.
 
@@ -43,8 +43,8 @@ lọt kệ hàng xóm** (Kimchi, Ice Tea Sweet Peach ở test2; nền/tay ngư�
 IoU với ground-truth không tệ. Nguyên nhân: keep-prompt "product"/"store shelf" chấm
 điểm cao như nhau cho CẢ kệ mục tiêu VÀ kệ hàng xóm (kệ hàng xóm cũng là "sản phẩm
 trên kệ" về mặt ngữ nghĩa), và exclude-prompt hiện tại (floor/ceiling/person/empty
-background) không có prompt nào loại trừ được "kệ khác cạnh kệ chính" — nên 2 kệ bị
+background) không có prompt nào loại trừ được "kệ khác cạnh kệ chính", nên 2 kệ bị
 nối liền thành 1 connected-component duy nhất khi không có khoảng sàn/trần rõ ràng
-ngăn cách trong khung hình. Đây là giới hạn thiết kế prompt, không phải lỗi threshold
-— fallback hiện tại (mask rỗng/quá nhỏ) không bắt được case này vì mask vẫn hợp lệ,
+ngăn cách trong khung hình. Đây là giới hạn thiết kế prompt, không phải lỗi threshold,
+fallback hiện tại (mask rỗng/quá nhỏ) không bắt được case này vì mask vẫn hợp lệ,
 chỉ là "quá rộng". Xem báo cáo so sánh auto-crop vs crop tay để chi tiết từng ảnh.

@@ -5,9 +5,7 @@
 
 ## Context
 
-ADR-001 chốt trình tự triển khai "contract-first": chốt JSON schema của `POST /analyze`
-trước khi implement, để `api` (mock `ml-service`) và `web` phát triển song song không bị
-chặn bởi CV pipeline thật. Tài liệu này chốt schema đó.
+ADR-001 chốt trình tự triển khai "contract-first": chốt JSON schema của `POST /analyze` trước khi implement, để `api` (mock `ml-service`) và `web` phát triển song song không bị chặn bởi CV pipeline thật. Tài liệu này chốt schema đó.
 
 ## Kiến trúc luồng dữ liệu
 
@@ -26,10 +24,7 @@ web  --multipart(store_id, shelf_id, image)-->  api  POST /analyze
                                                    total_value }
 ```
 
-**Nguyên tắc phân tầng:** `ml-service` chỉ biết về pixel — box, sku_id (nếu nhận diện được),
-confidence. Nó KHÔNG biết giá hay `shelf_full_qty` (đó là dữ liệu nghiệp vụ/catalog, không phải
-CV). `api` chịu trách nhiệm join catalog và aggregate `quantities` từ `boxes` — `quantities`
-không phải nguồn dữ liệu độc lập.
+**Nguyên tắc phân tầng:** `ml-service` chỉ biết về pixel: box, sku_id (nếu nhận diện được), confidence. Nó KHÔNG biết giá hay `shelf_full_qty` (đó là dữ liệu nghiệp vụ/catalog, không phải CV). `api` chịu trách nhiệm join catalog và aggregate `quantities` từ `boxes`, `quantities` không phải nguồn dữ liệu độc lập.
 
 ## `ml-service`: `POST /predict`
 
@@ -58,11 +53,9 @@ Response:
 }
 ```
 
-`image.width/height` đọc từ ảnh thật (Pillow) — không phải mock. `boxes`/`warnings` ở giai
-đoạn hiện tại là mock cố định, không phụ thuộc nội dung ảnh.
+`image.width/height` đọc từ ảnh thật (Pillow), không phải mock. `boxes`/`warnings` ở giai đoạn hiện tại là mock cố định, không phụ thuộc nội dung ảnh.
 
-`ml-service` không biết `unit_price`/`shelf_full_qty`/`subtotal`/`quantities`/`total_value` —
-các trường đó chỉ xuất hiện ở response của `api`, không xuất hiện ở đây.
+`ml-service` không biết `unit_price`/`shelf_full_qty`/`subtotal`/`quantities`/`total_value`, các trường đó chỉ xuất hiện ở response của `api`, không xuất hiện ở đây.
 
 ## `api`: `POST /analyze`
 
@@ -73,8 +66,7 @@ các trường đó chỉ xuất hiện ở response của `api`, không xuất 
 - `shelf_id` (string, bắt buộc)
 - `image` (file, bắt buộc)
 
-Lý do chọn multipart thay vì base64 JSON: khớp trực tiếp với `<input type="file">` ở `web`,
-không cần encode/decode base64 ở client; `api` forward multipart nguyên trạng sang `ml-service`.
+Lý do chọn multipart thay vì base64 JSON: khớp trực tiếp với `<input type="file">` ở `web`, không cần encode/decode base64 ở client; `api` forward multipart nguyên trạng sang `ml-service`.
 
 ### Response
 
@@ -122,17 +114,12 @@ không cần encode/decode base64 ở client; `api` forward multipart nguyên tr
 
 ### Field notes
 
-- `boxes`: passthrough gần như nguyên trạng từ `ml-service`, chỉ thêm `sku_name` nếu
-  `ml-service` không tự điền (mock hiện tại đã điền sẵn).
-- `quantities`: aggregate server-side, group theo `sku_id` trên các box có `type: "product"`
-  và `sku_id != null` (box `type: "gap"` hoặc `is_unknown: true` không vào `quantities` — không
-  có SKU để định giá). `facing_count` = số box cùng `sku_id`. `depth` = 1 (cố định ở giai đoạn
-  hiện tại — pipeline CV chưa ước lượng depth). `total_quantity` = `facing_count * depth`.
-  `unit_price`/`shelf_full_qty`/`subtotal` join từ `catalog_seed.csv` theo `sku_id`.
+- `boxes`: passthrough gần như nguyên trạng từ `ml-service`, chỉ thêm `sku_name` nếu `ml-service` không tự điền (mock hiện tại đã điền sẵn).
+- `quantities`: aggregate server-side, group theo `sku_id` trên các box có `type: "product"` và `sku_id != null` (box `type: "gap"` hoặc `is_unknown: true` không vào `quantities`, không có SKU để định giá). `facing_count` = số box cùng `sku_id`. `depth` = 1 (cố định ở giai đoạn hiện tại, pipeline CV chưa ước lượng depth). `total_quantity` = `facing_count * depth`. `unit_price`/`shelf_full_qty`/`subtotal` join từ `catalog_seed.csv` theo `sku_id`.
 - `total_value` = tổng `subtotal` của `quantities`.
 - `warnings`: passthrough từ `ml-service`.
 
-### `flag_status` (hằng số, không hardcode rải rác — xem `api/src/config/flagStatus.js`)
+### `flag_status` (hằng số, không hardcode rải rác, xem `api/src/config/flagStatus.js`)
 
 - `out`: `total_quantity == 0`
 - `low`: `total_quantity < LOW_STOCK_RATIO * shelf_full_qty` (`LOW_STOCK_RATIO = 0.3`)
@@ -141,12 +128,8 @@ không cần encode/decode base64 ở client; `api` forward multipart nguyên tr
 ### `status`
 
 - `"ok"`: gọi `ml-service` thành công, mọi box nhận diện được (không có `is_unknown: true`).
-- `"partial"`: gọi `ml-service` thành công NHƯNG có ít nhất 1 box `is_unknown: true` (vùng có
-  sản phẩm nhưng không khớp catalog). Dữ liệu vẫn đầy đủ và hiển thị bình thường như `"ok"` —
-  `"partial"` không được xử lý giống `"failed"`, không được ẩn `boxes`/`quantities`. FE chỉ tô
-  cảnh báo nhẹ để người dùng biết có sản phẩm chưa nhận diện được.
-- `"failed"`: gọi `ml-service` lỗi (network error, timeout, non-2xx). `error_message` chứa lý
-  do; `boxes`/`quantities` là mảng rỗng, `image` là `{width: 0, height: 0}`, `total_value` = 0.
+- `"partial"`: gọi `ml-service` thành công NHƯNG có ít nhất 1 box `is_unknown: true` (vùng có sản phẩm nhưng không khớp catalog). Dữ liệu vẫn đầy đủ và hiển thị bình thường như `"ok"`, không được xử lý giống `"failed"`, không được ẩn `boxes`/`quantities`. FE chỉ tô cảnh báo nhẹ để người dùng biết có sản phẩm chưa nhận diện được.
+- `"failed"`: gọi `ml-service` lỗi (network error, timeout, non-2xx). `error_message` chứa lý do; `boxes`/`quantities` là mảng rỗng, `image` là `{width: 0, height: 0}`, `total_value` = 0.
 
 `error_message`: `null` trừ khi `status == "failed"`.
 
@@ -216,18 +199,15 @@ không cần encode/decode base64 ở client; `api` forward multipart nguyên tr
 ## Mock data (giai đoạn hiện tại)
 
 `ml-service` trả `boxes` cố định, không phụ thuộc nội dung ảnh upload, gồm:
-- 2 box `type: "product"`, `sku_id: "choco_pie_org"` (SKU thật trong `catalog_seed.csv`) —
-  để test facing_count aggregate và catalog join.
-- 1 box `type: "product"`, `sku_id: "karo_org"` — SKU thật khác, để test có nhiều SKU trong
-  1 lần quét.
-- 1 box `type: "product"`, `is_unknown: true`, `sku_id: null` — để test nhánh `status: "partial"`.
-- 1 box `type: "gap"` — để test box không vào `quantities`.
+- 2 box `type: "product"`, `sku_id: "choco_pie_org"` (SKU thật trong `catalog_seed.csv`), để test facing_count aggregate và catalog join.
+- 1 box `type: "product"`, `sku_id: "karo_org"`, SKU thật khác, để test có nhiều SKU trong 1 lần quét.
+- 1 box `type: "product"`, `is_unknown: true`, `sku_id: null`, để test nhánh `status: "partial"`.
+- 1 box `type: "gap"`, để test box không vào `quantities`.
 
 `image.width`/`image.height` đọc thật từ file upload qua Pillow.
 
 ## Out of scope (giai đoạn này)
 
 - `depth` ước lượng thật (đang cố định = 1).
-- `ml-service` gọi pipeline CV thật (`src/pipeline/scan.py`) — nối sau khi backend CV ổn định
-  hơn, theo checkpoint rollback ở ADR-001.
+- `ml-service` gọi pipeline CV thật (`src/pipeline/scan.py`), nối sau khi backend CV ổn định hơn, theo checkpoint rollback ở ADR-001.
 - Auth, rate limiting, upload size limit ngoài giới hạn mặc định của multer.

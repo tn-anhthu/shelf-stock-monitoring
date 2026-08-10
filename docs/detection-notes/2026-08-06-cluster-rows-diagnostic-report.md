@@ -1,17 +1,17 @@
-# Diagnostic Report: cluster_rows chaining fix — visual/mechanical evidence for human decision
+# Diagnostic Report: cluster_rows chaining fix: visual/mechanical evidence for human decision
 
 > **Superseded 2026-08-10:** the `runs/detect/runs/train_1a/n_2000/weights/best.pt`
 > checkpoint referenced throughout this report's methodology has been replaced by
-> YOLO26n — see `docs/superpowers/plans/2026-08-10-yolo26n-migration.md`. This report
+> YOLO26n, see `docs/superpowers/plans/2026-08-10-yolo26n-migration.md`. This report
 > is left as an unedited historical record of the row-clustering investigation.
 
 > **Archived as written on 06/08/2026, TRƯỚC khi revert.** "Currently committed", "hiện tại", hay
 > các cụm tương tự trong báo cáo này đều chỉ trạng thái tại thời điểm viết (commit `4a9ffed`,
-> thuật toán row-mean + span-cap) — KHÔNG phải trạng thái hiện tại của `row_clustering.py`. File
+> thuật toán row-mean + span-cap): KHÔNG phải trạng thái hiện tại của `row_clustering.py`. File
 > này đã được revert về thuật toán gốc ngay trong chính commit đã lưu báo cáo này (xem
 > `docs/detection-notes/detection-log.md`, mục 06/08/2026).
 
-Status: DONE_WITH_CONCERNS (see "What could not be verified" at the end — everything
+Status: DONE_WITH_CONCERNS (see "What could not be verified" at the end, everything
 else below is real command output, no estimates).
 
 No tracked files were modified. `git status --porcelain` at the end of this
@@ -19,7 +19,7 @@ investigation shows only pre-existing untracked symlinks (`.venv-e2e`, `runs`,
 `docs/superpowers`, `data/scan_viz/input/input_crop`) plus the new
 `data/scan_viz/diagnostic_test{1,2,3}/annotated.jpg` outputs, all covered by
 `.gitignore` (`data/scan_viz/*` with `!data/scan_viz/input/` /
-`!data/scan_viz/review.xlsx` exceptions — confirmed via `git check-ignore -v`).
+`!data/scan_viz/review.xlsx` exceptions, confirmed via `git check-ignore -v`).
 `scripts/verify_cluster_rows_fix.py` was used unmodified.
 
 ## Environment / methodology
@@ -33,11 +33,9 @@ investigation shows only pre-existing untracked symlinks (`.venv-e2e`, `runs`,
   4a9ffed~1:src/pipeline/row_clustering.py`. Step 3 calls the CURRENT
   (Task-1-fixed, committed) `cluster_rows(boxes_merged, row_cluster_tolerance)`
   at its default `max_span_multiplier=2.0`.
-- Two throwaway scripts were written outside the tracked tree (not committed,
-  not part of the repo):
-  `/private/tmp/claude-501/-Users-realzoey-Project-shelf-stock-monitoring/7cd2c751-e4f5-4ff0-81c4-7a20c64b284a/scratchpad/step1_old_rows.py`
-  and
-  `/private/tmp/claude-501/-Users-realzoey-Project-shelf-stock-monitoring/7cd2c751-e4f5-4ff0-81c4-7a20c64b284a/scratchpad/step3_group_breakdown.py`.
+- Two throwaway scripts were written outside the tracked tree, in a local
+  scratchpad directory (not committed, not part of the repo):
+  `step1_old_rows.py` and `step3_group_breakdown.py`.
 - Step 4 annotated images were produced by the existing, unmodified
   `scripts/verify_cluster_rows_fix.py --out ...` (per-image `--check-region`
   flags for that image's regions).
@@ -46,7 +44,7 @@ investigation shows only pre-existing untracked symlinks (`.venv-e2e`, `runs`,
 
 ## Step 1 result: exact real box coordinates for "old row 5" and "old row 18" (test3.HEIC)
 
-Real run output (`raw: 54  merged: 54` — `merge_adjacent_fragments` made no
+Real run output (`raw: 54  merged: 54`, `merge_adjacent_fragments` made no
 change to test3's box count, so old-row and current-row boxes below are
 byte-identical to raw detections). `row_cluster_tolerance=23.4291`,
 `y_gap_tolerance=4.5106`.
@@ -106,8 +104,8 @@ For each region below: purpose, coordinates, annotated image path,
 (from the unmodified script, run through the full pipeline including
 `filter_anomalous_boxes` → `filter_contained_boxes` → `detect_gaps`), and the
 Step 3 breakdown (current, Task-1-fixed `cluster_rows` at default
-`max_span_multiplier=2.0`, run on `boxes_merged` only — no anomaly/containment
-filtering — per the brief's Step 3 spec).
+`max_span_multiplier=2.0`, run on `boxes_merged` only, no anomaly/containment
+filtering, per the brief's Step 3 spec).
 
 ### test1.HEIC
 
@@ -115,7 +113,7 @@ Annotated image: `data/scan_viz/diagnostic_test1/annotated.jpg`
 (`raw: 60  merged: 60  after filter_anomalous_boxes: 60  after
 filter_contained_boxes: 59 (2 flagged)  gaps: 1`)
 
-**Region: test1 new gap (post-fix)** — `1326.8,2840.4,1996.9,3116.4`
+**Region: test1 new gap (post-fix)**: `1326.8,2840.4,1996.9,3116.4`
 
 - Script's own check-region output: `check-region (1326.8, 2840.4, 1996.9,
   3116.4): PHANTOM GAP STILL PRESENT (1 overlapping gap(s))`. The single gap
@@ -139,7 +137,7 @@ filter_contained_boxes: 93 (8 flagged)  gaps: 13`)
 `cluster_rows(boxes_merged, tolerance=15.5402)` → 27 rows total (Step 3, all
 5 regions below).
 
-**Region: test2 gap#1** — `1821.8,109.0,2422.4,646.9`
+**Region: test2 gap#1**: `1821.8,109.0,2422.4,646.9`
 
 - Script output: `PHANTOM GAP STILL PRESENT (1 overlapping gap(s))`. Matching
   reported gap: `(1821.8, 109.0, 2422.4, 646.9)`.
@@ -153,7 +151,7 @@ filter_contained_boxes: 93 (8 flagged)  gaps: 13`)
     (1830.5,151.7,2020.9,673.5) yc=412.6; (2030.4,153.6,2212.8,653.6)
     yc=403.6; (2222.0,158.2,2412.2,646.5) yc=402.3
 
-**Region: test2 gap#2** — `534.7,1796.9,2908.7,2142.8`
+**Region: test2 gap#2**: `534.7,1796.9,2908.7,2142.8`
 
 - Script output: `PHANTOM GAP STILL PRESENT (1 overlapping gap(s))`. Matching
   reported gap: `(534.7, 1796.9, 2908.7, 2142.8)`.
@@ -175,7 +173,7 @@ filter_contained_boxes: 93 (8 flagged)  gaps: 13`)
     (2540.9,1866.0,2689.1,2198.4) yc=2032.2; (2697.6,1855.6,2874.4,2208.6)
     yc=2032.1
 
-**Region: test2 gap#3** — `2407.4,2370.0,2561.8,2713.1`
+**Region: test2 gap#3**: `2407.4,2370.0,2561.8,2713.1`
 
 - Script output: `PHANTOM GAP STILL PRESENT (1 overlapping gap(s))`. Matching
   reported gap: `(2407.4, 2370.0, 2561.8, 2713.1)`.
@@ -183,11 +181,11 @@ filter_contained_boxes: 93 (8 flagged)  gaps: 13`)
   - Group row-17 (n=1, yc-span 2552.7-2552.7, delta=0.0): box
     (2417.9,2391.5,2559.2,2714.0) yc=2552.7
 
-**Region: test2 gap#4** — `898.3,2865.3,1763.9,3112.1`
+**Region: test2 gap#4**: `898.3,2865.3,1763.9,3112.1`
 
 - Script output: `PHANTOM GAP STILL PRESENT (6 overlapping gap(s))`. This
   region overlaps 6 of the 13 gaps `detect_gaps` reports for this image (the
-  script does not print which — see the full 13-gap list logged for test2
+  script does not print which, see the full 13-gap list logged for test2
   above/near the top of this section).
 - Step 3: **7 distinct groups overlap** (row indices 19, 20, 21, 22, 24, 25, 26):
   - Group row-19 (n=1, yc-span 2965.3-2965.3, delta=0.0): box
@@ -216,10 +214,10 @@ filter_contained_boxes: 93 (8 flagged)  gaps: 13`)
     (1333.1,3077.5,1531.5,3326.7) yc=3202.1; (1547.6,3103.9,1740.4,3329.7)
     yc=3216.8; (1750.3,3085.0,1957.9,3331.4) yc=3208.2
 
-**Region: test2 gap#5** — `688.6,2900.3,910.5,3113.2`
+**Region: test2 gap#5**: `688.6,2900.3,910.5,3113.2`
 
 - Script output: `PHANTOM GAP STILL PRESENT (3 overlapping gap(s))`.
-- Step 3: **6 distinct groups overlap** (row indices 19, 20, 21, 22, 24, 26) —
+- Step 3: **6 distinct groups overlap** (row indices 19, 20, 21, 22, 24, 26),
   same groups as gap#4's list minus row-25 (this region is a spatial subset
   near the same crowded area). Box lists for rows 19/20/21/22/24/26 are
   identical to those printed under gap#4 above (same underlying
@@ -235,7 +233,7 @@ filter_contained_boxes: 47 (9 flagged)  gaps: 3`)
 `cluster_rows(boxes_merged, tolerance=23.4291)` → 26 rows total (Step 3, all
 4 regions below).
 
-**Region: test3 known-gap#1 (byte-identical pre/post fix)** — `1733.8,1011.0,2027.2,1351.7`
+**Region: test3 known-gap#1 (byte-identical pre/post fix)**: `1733.8,1011.0,2027.2,1351.7`
 
 - Script output: `PHANTOM GAP STILL PRESENT (1 overlapping gap(s))`. Matching
   reported gap: `(1733.8, 1011.0, 2027.2, 1351.7)`.
@@ -252,7 +250,7 @@ filter_contained_boxes: 47 (9 flagged)  gaps: 3`)
   - Group row-7 (n=1, yc-span 1534.8-1534.8, delta=0.0): box
     (1764.2,1264.7,2027.2,1804.9) yc=1534.8
 
-**Region: test3 known-gap#2 (byte-identical pre/post fix)** — `176.5,1293.0,1237.1,1875.9`
+**Region: test3 known-gap#2 (byte-identical pre/post fix)**: `176.5,1293.0,1237.1,1875.9`
 
 - Script output: `PHANTOM GAP STILL PRESENT (1 overlapping gap(s))`. Matching
   reported gap: `(176.5, 1293.0, 1237.1, 1875.9)`.
@@ -267,13 +265,13 @@ filter_contained_boxes: 47 (9 flagged)  gaps: 3`)
     (0.0,1293.0,176.5,1875.9) yc=1584.4; (1237.1,1372.9,1468.6,1822.2)
     yc=1597.5; (2912.7,1368.2,3024.0,1787.7) yc=1578.0
 
-**Region: test3 old-row-5 bounding region (derived, Step 1)** — `185.9,1093.7,1472.4,1877.7`
+**Region: test3 old-row-5 bounding region (derived, Step 1)**: `185.9,1093.7,1472.4,1877.7`
 
-- Script output: `PHANTOM GAP STILL PRESENT (1 overlapping gap(s))` — this
+- Script output: `PHANTOM GAP STILL PRESENT (1 overlapping gap(s))`, this
   bounding region spatially overlaps known-gap#2's coordinates (they share
   most of the same x/y area), so it picks up the same reported gap
   `(176.5, 1293.0, 1237.1, 1875.9)`.
-- Step 3: **3 distinct groups overlap** — **identical group set to
+- Step 3: **3 distinct groups overlap**: **identical group set to
   known-gap#2 above** (row indices 5, 6, 8; same box lists as printed there).
   Cross-checking against the exact 5-box old-row-5 list from Step 1:
   - Group row-5's 3 boxes (722.5,1113.8,961.2,1848.9),
@@ -284,8 +282,8 @@ filter_contained_boxes: 47 (9 flagged)  gaps: 3`)
     original old-row-5 boxes.
   - **Together, groups row-5 and row-6 account for all 5 original old-row-5
     boxes, split 3+2.**
-  - Group row-8's 3 boxes — (0.0,1293.0,176.5,1875.9),
-    (1237.1,1372.9,1468.6,1822.2), (2912.7,1368.2,3024.0,1787.7) — do **not**
+  - Group row-8's 3 boxes, (0.0,1293.0,176.5,1875.9),
+    (1237.1,1372.9,1468.6,1822.2), (2912.7,1368.2,3024.0,1787.7), do **not**
     match any of the 5 original old-row-5 boxes exactly. Group row-8 only
     appears in this region's match list because one of its boxes,
     (1237.1,1372.9,1468.6,1822.2), geometrically overlaps the bounding
@@ -295,7 +293,7 @@ filter_contained_boxes: 47 (9 flagged)  gaps: 3`)
     using a bounding-rectangle region, not evidence that row-8 is part of
     old-row-5.
 
-**Region: test3 old-row-18 bounding region (derived, Step 1)** — `0.0,2933.9,2769.5,3641.7`
+**Region: test3 old-row-18 bounding region (derived, Step 1)**: `0.0,2933.9,2769.5,3641.7`
 
 - Script output: `PHANTOM GAP STILL PRESENT (1 overlapping gap(s))`. Matching
   reported gap: `(306.0, 2933.9, 818.1, 3636.5)`.
@@ -322,7 +320,7 @@ filter_contained_boxes: 47 (9 flagged)  gaps: 3`)
     **groups row-19 (5 boxes), row-20 (4 boxes), and row-21 (3 boxes) are, in
     total, byte-identical to all 12 original old-row-18 boxes**, split 5+4+3.
     Groups row-16, row-17, and row-22 (1 box each) do **not** match any of
-    the 12 original old-row-18 boxes exactly — each has an x-range close to
+    the 12 original old-row-18 boxes exactly, each has an x-range close to
     one of the 12 originals but a different y-range (e.g. row-16's box
     (44.1,2936.8,302.8,3232.8) has x-range close to original box #2
     (41.9,2933.9,306.0,3636.5) but y2=3232.8 vs. 3636.5). These 3 groups only
@@ -339,20 +337,20 @@ filter_contained_boxes: 47 (9 flagged)  gaps: 3`)
   for group row-8 in old-row-5's region, and groups row-16/17/22 in
   old-row-18's region). This is a mechanical property of the region-overlap
   check reused from `scripts/verify_cluster_rows_fix.py`'s `box_overlaps_region`,
-  not a defect in `cluster_rows` — flagged so the human reviewer doesn't
+  not a defect in `cluster_rows`, flagged so the human reviewer doesn't
   mistake "N groups overlap the region" for "N groups made up entirely of the
   original row's boxes." The byte-identical cross-check for each region
   (given above) separates the two.
 - test2 gap#4 and gap#5's script output reports "6 overlapping gap(s)" and "3
   overlapping gap(s)" respectively but does not print *which* of the 13 total
   gaps overlap by coordinate (the script's `--check-region` output only gives
-  a count) — the full list of all 13 gaps for test2 is logged above/verbatim
+  a count), the full list of all 13 gaps for test2 is logged above/verbatim
   from the script's own stdout, but I did not independently re-derive which
   named gap indices correspond to which check-region beyond what's mechanically
   implied by the coordinates.
 - I did not re-verify test1/test2's 6 given gap coordinates via independent
   re-computation (per the task's instruction, these were usable as-given from
-  Task 2/3's reports) — I only ran them through the current script and Step-3
+  Task 2/3's reports), I only ran them through the current script and Step-3
   breakdown, which is what this diagnostic asked for.
 - No numbers in this report are estimated; every box/gap/group value above is
   copied verbatim from real command output.
