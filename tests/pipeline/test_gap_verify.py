@@ -213,3 +213,100 @@ def test_call_model_sends_image_as_data_url(monkeypatch):
     content = client.chat.completions.calls[0]["messages"][0]["content"]
     image_block = next(c for c in content if c["type"] == "image_url")
     assert image_block["image_url"]["url"].startswith("data:image/jpeg;base64,")
+
+
+def test_verify_gap_returns_gap_verdict_from_primary_model(monkeypatch):
+    monkeypatch.setattr(gap_verify.time, "sleep", lambda s: None)
+    client = _scripted_client({gap_verify.PRIMARY_MODEL: [{"verdict": "gap", "reason": "empty shelf space"}]})
+    image = Image.new("RGB", (400, 400))
+    box = (100.0, 100.0, 200.0, 200.0)
+
+    result = gap_verify.verify_gap(client, image, box)
+
+    assert result == {"box": box, "verdict": "gap", "reason": "empty shelf space", "needs_review": False}
+    assert len(client.chat.completions.calls) == 1  # primary succeeded, fallback never called
+
+
+def test_verify_gap_does_not_escalate_to_fallback_on_uncertain_verdict(monkeypatch):
+    # Spec S6: "uncertain" from the primary model is a final answer, not a
+    # trigger to also call the fallback -- fallback is only for
+    # *infrastructure* failure (the primary call itself erroring).
+    monkeypatch.setattr(gap_verify.time, "sleep", lambda s: None)
+    client = _scripted_client({gap_verify.PRIMARY_MODEL: [{"verdict": "uncertain", "reason": "hard to tell"}]})
+    image = Image.new("RGB", (400, 400))
+    box = (100.0, 100.0, 200.0, 200.0)
+
+    result = gap_verify.verify_gap(client, image, box)
+
+    assert result["verdict"] == "uncertain"
+    assert result["needs_review"] is True
+    assert len(client.chat.completions.calls) == 1
+
+
+def test_verify_gap_falls_back_to_luna_when_primary_errors(monkeypatch):
+    monkeypatch.setattr(gap_verify.time, "sleep", lambda s: None)
+    client = _scripted_client({
+        gap_verify.PRIMARY_MODEL: [ConnectionError("a"), ConnectionError("b"), ConnectionError("c")],
+        gap_verify.FALLBACK_MODEL: [{"verdict": "not_gap", "reason": "shelf divider"}],
+    })
+    image = Image.new("RGB", (400, 400))
+    box = (100.0, 100.0, 200.0, 200.0)
+
+    result = gap_verify.verify_gap(client, image, box)
+
+    assert result["verdict"] == "not_gap"
+    assert result["needs_review"] is False
+    calls = client.chat.completions.calls
+    primary_calls = [c for c in calls if c["model"] == gap_verify.PRIMARY_MODEL]
+    fallback_calls = [c for c in calls if c["model"] == gap_verify.FALLBACK_MODEL]
+    assert len(primary_calls) == 3  # exhausted its own retries first
+    assert len(fallback_calls) == 1
+    assert fallback_calls[0]["extra_body"]["reasoning_effort"] == "low"
+
+
+def test_verify_gap_kept_as_uncertain_when_both_models_fail(monkeypatch):
+    monkeypatch.setattr(gap_verify.time, "sleep", lambda s: None)
+    client = _scripted_client({
+        gap_verify.PRIMARY_MODEL: [ConnectionError("a")] * 3,
+        gap_verify.FALLBACK_MODEL: [ConnectionError("b")] * 3,
+    })
+    image = Image.new("RGB", (400, 400))
+    box = (100.0, 100.0, 200.0, 200.0)
+
+    result = gap_verify.verify_gap(client, image, box)
+
+    # never silently dropped -- the box is still present, just marked uncertain
+    assert result["box"] == box
+    assert result["verdict"] == "uncertain"
+    assert result["needs_review"] is True
+
+
+def test_verify_gap_degenerate_crop_kept_as_uncertain_without_calling_client():
+    client = _scripted_client({})
+    image = Image.new("RGB", (400, 400))
+    box = (500.0, 500.0, 500.0, 500.0)  # zero-area, entirely outside the image
+
+    result = gap_verify.verify_gap(client, image, box)
+
+    assert result["verdict"] == "uncertain"
+    assert result["needs_review"] is True
+    assert client.chat.completions.calls == []
+
+
+def test_verify_gap_crop_includes_context_margin_beyond_raw_box(monkeypatch):
+    monkeypatch.setattr(gap_verify.time, "sleep", lambda s: None)
+    client = _scripted_client({gap_verify.PRIMARY_MODEL: [{"verdict": "gap", "reason": "ok"}]})
+    image = Image.new("RGB", (400, 400))
+    box = (100.0, 100.0, 200.0, 200.0)  # 100x100 raw box
+
+    gap_verify.verify_gap(client, image, box)
+
+    content = client.chat.completions.calls[0]["messages"][0]["content"]
+    image_block = next(c for c in content if c["type"] == "image_url")
+    data_url = image_block["image_url"]["url"]
+    raw = base64.b64decode(data_url.split(",", 1)[1])
+    sent_image = Image.open(io.BytesIO(raw))
+    # cropped with context_padding_ratio > 0 -> strictly larger than the raw 100x100 box,
+    # proof this crops fresh from the real bbox + margin, not a pre-existing fixed-size file
+    assert sent_image.width > 100
+    assert sent_image.height > 100

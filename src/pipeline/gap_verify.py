@@ -169,3 +169,44 @@ def _call_model(
             if attempt == max_retries:
                 raise
             time.sleep(RETRY_BACKOFF_BASE_SECONDS * (2 ** attempt))
+
+
+def verify_gap(
+    client,
+    image: Image.Image,
+    box: Box,
+    context_padding_ratio: float = CONTEXT_PADDING_RATIO,
+) -> Dict:
+    """Fail-open, 3-tier verification of a single detect_gaps() candidate
+    (spec S6): try PRIMARY_MODEL, then FALLBACK_MODEL only if PRIMARY_MODEL's
+    call itself raised (not merely because it answered "uncertain" -- that's
+    a valid, final tier-1 answer). If both models fail, the candidate is kept
+    as "uncertain" rather than dropped -- losing a real gap is worse than one
+    unresolved review item."""
+    cropped = crop_box(image, box, padding_ratio=context_padding_ratio)
+    if cropped is None:
+        return {
+            "box": box,
+            "verdict": "uncertain",
+            "reason": "degenerate crop (outside image bounds)",
+            "needs_review": True,
+        }
+
+    try:
+        verdict, reason, _usage = _call_model(client, PRIMARY_MODEL, cropped)
+        return {"box": box, "verdict": verdict, "reason": reason, "needs_review": verdict == "uncertain"}
+    except Exception:
+        pass
+
+    try:
+        verdict, reason, _usage = _call_model(client, FALLBACK_MODEL, cropped, reasoning_effort="low")
+        return {"box": box, "verdict": verdict, "reason": reason, "needs_review": verdict == "uncertain"}
+    except Exception:
+        pass
+
+    return {
+        "box": box,
+        "verdict": "uncertain",
+        "reason": "gap_verify: both primary and fallback models failed, kept for human review",
+        "needs_review": True,
+    }
