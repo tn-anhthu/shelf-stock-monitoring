@@ -310,3 +310,28 @@ def test_verify_gap_crop_includes_context_margin_beyond_raw_box(monkeypatch):
     # proof this crops fresh from the real bbox + margin, not a pre-existing fixed-size file
     assert sent_image.width > 100
     assert sent_image.height > 100
+
+
+def test_verify_gaps_drops_not_gap_and_keeps_gap_and_uncertain(monkeypatch):
+    monkeypatch.setattr(gap_verify.time, "sleep", lambda s: None)
+    client = _scripted_client({
+        gap_verify.PRIMARY_MODEL: [
+            {"verdict": "gap", "reason": "empty"},
+            {"verdict": "not_gap", "reason": "shelf divider"},
+            {"verdict": "uncertain", "reason": "hard to tell"},
+        ],
+    })
+    image = Image.new("RGB", (400, 400))
+    gaps = [(0.0, 0.0, 50.0, 50.0), (60.0, 0.0, 110.0, 50.0), (120.0, 0.0, 170.0, 50.0)]
+
+    result = gap_verify.verify_gaps(client, image, gaps)
+
+    assert [r["verdict"] for r in result] == ["gap", "uncertain"]
+    assert [r["box"] for r in result] == [gaps[0], gaps[2]]
+
+
+def test_verify_gaps_empty_input_returns_empty_list():
+    client = _scripted_client({})
+    image = Image.new("RGB", (400, 400))
+
+    assert gap_verify.verify_gaps(client, image, []) == []

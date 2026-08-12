@@ -210,3 +210,10 @@ def verify_gap(
         "reason": "gap_verify: both primary and fallback models failed, kept for human review",
         "needs_review": True,
     }
+
+
+def verify_gaps(client, image: Image.Image, gaps: List[Box]) -> List[Dict]:
+    """Runs verify_gap on every detect_gaps() candidate and drops the ones
+    confirmed not_gap -- "gap" and "uncertain" both survive (spec S6)."""
+    verified = [verify_gap(client, image, box) for box in gaps]
+    return [g for g in verified if g["verdict"] != "not_gap"]
