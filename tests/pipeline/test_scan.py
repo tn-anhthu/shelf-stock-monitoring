@@ -218,7 +218,10 @@ def test_run_scan_merges_and_filters_boxes_before_classify_and_gaps():
     cleaned_boxes, _flagged, _pairs = filter_contained_boxes(cleaned_boxes)
     assert len(cleaned_boxes) == 3
     assert len(result["detections"]) == 3
-    assert result["gaps"] == detect_gaps(cleaned_boxes, row_cluster_tolerance=row_cluster_tolerance)
+    assert result["gaps"] == [
+        {"box": box, "verdict": None, "reason": "", "needs_review": False}
+        for box in detect_gaps(cleaned_boxes, row_cluster_tolerance=row_cluster_tolerance)
+    ]
 
 
 def test_run_scan_drops_redundant_containing_box_and_reports_flagged_regions():
@@ -490,7 +493,69 @@ def test_run_scan_includes_gaps_from_detected_boxes():
 
     raw_boxes = fake_detect_fn(None)
     row_cluster_tolerance, _y_gap_tolerance = adaptive_tolerances(raw_boxes)
-    assert result["gaps"] == detect_gaps(raw_boxes, row_cluster_tolerance=row_cluster_tolerance)
+    assert result["gaps"] == [
+        {"box": box, "verdict": None, "reason": "", "needs_review": False}
+        for box in detect_gaps(raw_boxes, row_cluster_tolerance=row_cluster_tolerance)
+    ]
+
+
+def fake_detect_fn_with_real_gap(image):
+    return [(0, 0, 10, 10), (200, 0, 210, 10)]
+
+
+def test_run_scan_gaps_pass_through_unverified_when_gap_verify_client_is_none():
+    catalog_items = [{"sku_id": "choco_pie_orion", "name": "Chocopie", "price": 45000, "shelf_full_qty": 10}]
+    catalog_embeddings = [("choco_pie_orion", np.array([1.0, 0.0]))]
+
+    result = run_scan(
+        image=FAKE_IMAGE,
+        catalog_items=catalog_items,
+        catalog_embeddings=catalog_embeddings,
+        detect_fn=fake_detect_fn_with_real_gap,
+        embed_fn=fake_embed_fn,
+        llm_client=FakeLLMClient(answer="choco_pie_orion"),
+    )
+
+    raw_boxes = fake_detect_fn_with_real_gap(None)
+    row_cluster_tolerance, _y_gap_tolerance = adaptive_tolerances(raw_boxes)
+    expected_boxes = detect_gaps(raw_boxes, row_cluster_tolerance=row_cluster_tolerance)
+    assert expected_boxes  # sanity: this fixture must produce a real gap candidate
+    assert result["gaps"] == [
+        {"box": box, "verdict": None, "reason": "", "needs_review": False} for box in expected_boxes
+    ]
+
+
+def test_run_scan_calls_verify_gaps_when_gap_verify_client_provided(monkeypatch):
+    catalog_items = [{"sku_id": "choco_pie_orion", "name": "Chocopie", "price": 45000, "shelf_full_qty": 10}]
+    catalog_embeddings = [("choco_pie_orion", np.array([1.0, 0.0]))]
+
+    calls = []
+
+    def fake_verify_gaps(client, image, gaps):
+        calls.append((client, image, gaps))
+        return [{"box": gaps[0], "verdict": "gap", "reason": "empty shelf space", "needs_review": False}]
+
+    monkeypatch.setattr("src.pipeline.scan.verify_gaps", fake_verify_gaps)
+    sentinel_client = object()
+
+    result = run_scan(
+        image=FAKE_IMAGE,
+        catalog_items=catalog_items,
+        catalog_embeddings=catalog_embeddings,
+        detect_fn=fake_detect_fn_with_real_gap,
+        embed_fn=fake_embed_fn,
+        llm_client=FakeLLMClient(answer="choco_pie_orion"),
+        gap_verify_client=sentinel_client,
+    )
+
+    assert len(calls) == 1
+    passed_client, passed_image, passed_gaps = calls[0]
+    assert passed_client is sentinel_client
+    assert passed_image is FAKE_IMAGE
+    assert len(passed_gaps) == 1
+    assert result["gaps"] == [
+        {"box": passed_gaps[0], "verdict": "gap", "reason": "empty shelf space", "needs_review": False}
+    ]
 
 
 def test_run_scan_flags_undetected_catalog_sku_as_out():

@@ -22,6 +22,7 @@ from src.pipeline.classify import classify_crops_parallel, rank_candidates
 from src.pipeline.confidence import is_low_confidence
 from src.pipeline.crop import crop_box
 from src.pipeline.gap_detection import detect_gaps
+from src.pipeline.gap_verify import verify_gaps
 
 CONFIDENCE_THRESHOLD = 0.5
 
@@ -226,6 +227,7 @@ def run_scan(
     detect_fn: Callable,
     embed_fn: Callable,
     llm_client,
+    gap_verify_client=None,
     depth_by_index: Optional[Dict[int, int]] = None,
     top_k: int = 5,
     images_dir: str = "data/catalog/images",
@@ -239,6 +241,16 @@ def run_scan(
     boxes = filter_anomalous_boxes(boxes, row_cluster_tolerance=row_cluster_tolerance)
     boxes, flagged_regions, flagged_pairs = filter_contained_boxes(boxes)
     gaps = detect_gaps(boxes, row_cluster_tolerance=row_cluster_tolerance)
+    if gap_verify_client is not None:
+        gaps = verify_gaps(gap_verify_client, image, gaps)
+    else:
+        # gap_verify unavailable (spec S4: fail open, no regression) -- keep
+        # every geometry candidate, same recall as before this feature
+        # existed, just normalized to the same {box, verdict, reason,
+        # needs_review} shape verify_gaps() would have produced, so
+        # ml-service/mapping.py has one consistent contract to read
+        # regardless of whether verification actually ran.
+        gaps = [{"box": box, "verdict": None, "reason": "", "needs_review": False} for box in gaps]
 
     # Phase 1 (sequential): crop + embed + cosine-rank candidates per box.
     # Stays sequential because embed_fn shares the SigLIP2 model/GPU across
