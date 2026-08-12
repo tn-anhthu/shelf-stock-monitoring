@@ -43,18 +43,19 @@ def map_scan_result_to_response(
         if is_unknown:
             low_confidence_regions.append(box_id)
 
-    for gap_bbox in scan_result["gaps"]:
+    for gap in scan_result["gaps"]:
         box_id = f"b{box_index}"
         box_index += 1
         boxes_out.append(
             {
                 "box_id": box_id,
-                "bbox": list(gap_bbox),
+                "bbox": list(gap["box"]),
                 "type": "gap",
                 "sku_id": None,
                 "sku_name": None,
                 "confidence": 0.0,
                 "is_unknown": False,
+                "needs_review": gap["needs_review"],
             }
         )
 

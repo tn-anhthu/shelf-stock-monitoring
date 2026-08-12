@@ -62,7 +62,7 @@ def test_maps_gap_boxes_with_no_sku_and_continues_box_id_sequence():
     scan_result = {
         "boxes": [(10, 10, 110, 210)],
         "detections": [{"sku_id": "choco_pie_org", "confidence": 0.94, "depth": 1}],
-        "gaps": [(800, 40, 980, 420)],
+        "gaps": [{"box": (800, 40, 980, 420), "verdict": "gap", "reason": "empty shelf space", "needs_review": False}],
     }
 
     result = map_scan_result_to_response(scan_result, CATALOG_ITEMS, image_width=1200, image_height=900)
@@ -75,11 +75,10 @@ def test_maps_gap_boxes_with_no_sku_and_continues_box_id_sequence():
         "sku_name": None,
         "confidence": 0.0,
         "is_unknown": False,
+        "needs_review": False,
     }
     # gap boxes never get an excluded_from_count field - they're not products
     assert "excluded_from_count" not in result["boxes"][1]
-    # gap boxes never get a needs_review field either - they're not products
-    assert "needs_review" not in result["boxes"][1]
     # gap boxes never count toward low_confidence_regions
     assert result["warnings"]["low_confidence_regions"] == []
 
@@ -137,6 +136,22 @@ def test_maps_needs_review_flag_from_detection_onto_product_box():
             }
         ],
         "gaps": [],
+    }
+
+    result = map_scan_result_to_response(scan_result, CATALOG_ITEMS, image_width=1200, image_height=900)
+
+    assert result["boxes"][0]["needs_review"] is True
+
+
+def test_maps_needs_review_flag_from_gap_verify_onto_gap_box():
+    # A gap_verify "uncertain" verdict (src/pipeline/gap_verify.py) sets
+    # needs_review=True on the gap dict -- the API response must surface it
+    # the same way it already does for product boxes' needs_review, so the
+    # FE can reuse the same purple "needs review" border pattern.
+    scan_result = {
+        "boxes": [],
+        "detections": [],
+        "gaps": [{"box": (10, 10, 60, 60), "verdict": "uncertain", "reason": "hard to tell", "needs_review": True}],
     }
 
     result = map_scan_result_to_response(scan_result, CATALOG_ITEMS, image_width=1200, image_height=900)
