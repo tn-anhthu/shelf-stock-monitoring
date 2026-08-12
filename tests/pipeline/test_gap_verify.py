@@ -4,6 +4,8 @@ import json
 import time
 from types import SimpleNamespace
 
+import httpx
+import openai
 import pytest
 from PIL import Image
 
@@ -30,6 +32,19 @@ def test_build_client_reads_api_key_from_environment(monkeypatch):
     monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-from-env")
     client = gap_verify.build_client()
     assert client.api_key == "sk-or-v1-from-env"
+
+
+def test_build_client_sets_bounded_timeout_and_disables_sdk_retries():
+    # _call_model implements its own retry/backoff loop -- the SDK's own
+    # default retry behavior (max_retries=2) and long default read timeout
+    # must be disabled/bounded here so _call_model's retry constant is the
+    # sole retry authority and a hung call can't block the event loop
+    # indefinitely (this client is called synchronously from inside
+    # ml-service/app.py's async def predict()).
+    client = gap_verify.build_client(api_key="sk-or-v1-test")
+
+    assert client.max_retries == 0
+    assert client.timeout == 60.0
 
 
 class ScriptedCompletions:
@@ -151,6 +166,29 @@ def test_call_model_raises_after_exhausting_retries(monkeypatch):
         gap_verify._call_model(client, "m1", image, max_retries=2)
 
     assert len(client.chat.completions.calls) == 3  # 1 initial attempt + 2 retries
+
+
+def _rate_limit_error(message="rate limited"):
+    """Builds a real openai.RateLimitError, matching the installed SDK's
+    actual constructor (message, *, response: httpx.Response, body)."""
+    response = httpx.Response(
+        status_code=429,
+        request=httpx.Request("POST", "https://openrouter.ai/api/v1/chat/completions"),
+    )
+    return openai.RateLimitError(message, response=response, body=None)
+
+
+def test_call_model_fast_fails_on_rate_limit_without_retry_or_sleep(monkeypatch):
+    sleeps = []
+    monkeypatch.setattr(gap_verify.time, "sleep", lambda s: sleeps.append(s))
+    client = _scripted_client({"m1": [_rate_limit_error()]})
+    image = Image.new("RGB", (20, 20))
+
+    with pytest.raises(openai.RateLimitError):
+        gap_verify._call_model(client, "m1", image, max_retries=2)
+
+    assert len(client.chat.completions.calls) == 1  # no retry attempts consumed
+    assert sleeps == []  # never slept -- raised straight through
 
 
 def test_call_model_backs_off_between_retries(monkeypatch):

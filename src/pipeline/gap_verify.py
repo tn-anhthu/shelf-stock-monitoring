@@ -18,6 +18,7 @@ import os
 import time
 from typing import Dict, List, Optional, Tuple
 
+import openai
 from PIL import Image
 
 from src.detection.benchmark.metrics import Box
@@ -98,8 +99,14 @@ def build_client(api_key: Optional[str] = None):
     key = api_key if api_key is not None else os.environ.get("OPENROUTER_API_KEY")
     if not key:
         return None
-    import openai
-    return openai.OpenAI(base_url=OPENROUTER_BASE_URL, api_key=key)
+    # timeout/max_retries are explicit here so _call_model's own retry loop
+    # (below) is the sole retry authority: without these, the SDK's default
+    # max_retries=2 would silently multiply each of _call_model's own
+    # attempts into up to 3 HTTP requests, and its long default read timeout
+    # could block the FastAPI event loop (this client is used synchronously
+    # from within async def predict() in ml-service/app.py) far longer than
+    # is reasonable for a single vision-model call.
+    return openai.OpenAI(base_url=OPENROUTER_BASE_URL, api_key=key, timeout=60.0, max_retries=0)
 
 
 def _image_bytes(image: Image.Image) -> bytes:
@@ -165,6 +172,13 @@ def _call_model(
             if verdict not in VALID_VERDICTS:
                 raise ValueError(f"model {model} returned unexpected verdict {verdict!r}")
             return verdict, reason, usage
+        except openai.RateLimitError:
+            # A rate-limit/quota error (e.g. OpenRouter's free-tier daily
+            # cap) cannot resolve within this run -- retrying it just burns
+            # attempts and sleeps on an error that will never succeed.
+            # Raise straight through so verify_gap's fail-open logic moves
+            # on to the next model tier immediately.
+            raise
         except Exception:
             if attempt == max_retries:
                 raise

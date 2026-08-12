@@ -11,6 +11,9 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
+
+load_dotenv()
+
 from fastapi import FastAPI, File, UploadFile
 from google import genai
 from PIL import Image
@@ -25,8 +28,6 @@ from src.detection.train.run_trained_1a import detect_1a, load_model_1a
 from src.pipeline.classify import load_catalog_embeddings
 from src.pipeline.gap_verify import build_client as build_gap_verify_client
 from src.pipeline.scan import run_scan
-
-load_dotenv()
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 WEIGHTS_PATH = REPO_ROOT / "sku110k_yolo26n_results/weights/best.pt"
