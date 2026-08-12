@@ -8,4 +8,5 @@ torchvision==0.20.1
 transformers==5.14.1
 ultralytics>=8.3
 google-genai>=2.0
+openai>=1.0
 python-dotenv>=1.0
