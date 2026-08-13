@@ -20,8 +20,8 @@ describe('POST /confirm', () => {
   test('inserts a scan into SQLite and returns confirmed: true', async () => {
     const payload = {
       scan_id: 'scan-1',
-      store_id: 'store_01',
-      shelf_id: 'shelf_A1',
+      category: 'mi-goi',
+      container: 'ke-a',
       quantities: QUANTITIES,
       total_value: 60000,
     };
@@ -34,8 +34,8 @@ describe('POST /confirm', () => {
     const saved = scansDb.getScanById('scan-1');
     expect(saved).toMatchObject({
       scan_id: 'scan-1',
-      store_id: 'store_01',
-      shelf_id: 'shelf_A1',
+      category: 'mi-goi',
+      container: 'ke-a',
       total_value: 60000,
     });
     expect(saved.quantities).toEqual(QUANTITIES);
@@ -44,8 +44,8 @@ describe('POST /confirm', () => {
   test('rejects a request with an empty quantities array with 400', async () => {
     const res = await request(app).post('/confirm').send({
       scan_id: 'scan-2',
-      store_id: 'store_01',
-      shelf_id: 'shelf_A1',
+      category: 'mi-goi',
+      container: 'ke-a',
       quantities: [],
       total_value: 0,
     });
@@ -56,17 +56,17 @@ describe('POST /confirm', () => {
   test('rejects a request missing quantities entirely with 400', async () => {
     const res = await request(app).post('/confirm').send({
       scan_id: 'scan-3',
-      store_id: 'store_01',
-      shelf_id: 'shelf_A1',
+      category: 'mi-goi',
+      container: 'ke-a',
       total_value: 0,
     });
     expect(res.status).toBe(400);
   });
 
-  test('rejects a request missing store_id with 400', async () => {
+  test('rejects a request missing category with 400', async () => {
     const res = await request(app).post('/confirm').send({
       scan_id: 'scan-4',
-      shelf_id: 'shelf_A1',
+      container: 'ke-a',
       quantities: QUANTITIES,
       total_value: 60000,
     });
