@@ -1,5 +1,6 @@
 // Category/container registry for the Inventory page -- docs/superpowers/specs/2026-08-10-dashboard-design.md §2-3.
-// store_id/shelf_id on the `scans` table are reused as category slug / container id (no schema change).
+// The `scans` table columns are named category/container directly (no longer
+// a store_id/shelf_id reuse) -- see docs/superpowers/specs/2026-08-13-category-container-naming-design.md.
 
 const CATEGORIES = [
   {

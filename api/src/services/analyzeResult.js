@@ -45,15 +45,15 @@ function aggregateQuantities(boxes, catalog) {
   });
 }
 
-function buildSuccessResult({ storeId, shelfId, mlResult, catalog }) {
+function buildSuccessResult({ category, container, mlResult, catalog }) {
   const quantities = aggregateQuantities(mlResult.boxes, catalog);
   const totalValue = quantities.reduce((sum, q) => sum + q.subtotal, 0);
   const status = mlResult.boxes.some((box) => box.is_unknown) ? 'partial' : 'ok';
 
   return {
     scan_id: crypto.randomUUID(),
-    store_id: storeId,
-    shelf_id: shelfId,
+    category,
+    container,
     timestamp: new Date().toISOString(),
     status,
     error_message: null,
@@ -65,11 +65,11 @@ function buildSuccessResult({ storeId, shelfId, mlResult, catalog }) {
   };
 }
 
-function buildFailedResult({ storeId, shelfId, errorMessage }) {
+function buildFailedResult({ category, container, errorMessage }) {
   return {
     scan_id: crypto.randomUUID(),
-    store_id: storeId,
-    shelf_id: shelfId,
+    category,
+    container,
     timestamp: new Date().toISOString(),
     status: 'failed',
     error_message: errorMessage,

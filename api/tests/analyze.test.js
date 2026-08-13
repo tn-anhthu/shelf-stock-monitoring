@@ -9,8 +9,8 @@ const FAKE_IMAGE = Buffer.from([0x89, 0x50, 0x4e, 0x47]);
 
 function postAnalyze(fields = {}) {
   const req = request(app).post('/analyze');
-  if (fields.store_id !== undefined) req.field('store_id', fields.store_id);
-  if (fields.shelf_id !== undefined) req.field('shelf_id', fields.shelf_id);
+  if (fields.category !== undefined) req.field('category', fields.category);
+  if (fields.container !== undefined) req.field('container', fields.container);
   if (fields.attachImage !== false) req.attach('image', FAKE_IMAGE, 'shelf.jpg');
   return req;
 }
@@ -32,13 +32,13 @@ describe('POST /analyze', () => {
       warnings: WARNINGS,
     });
 
-    const res = await postAnalyze({ store_id: 'store_01', shelf_id: 'shelf_A1' });
+    const res = await postAnalyze({ category: 'mi-goi', container: 'ke-a' });
 
     expect(res.status).toBe(200);
     expect(res.body.status).toBe('ok');
     expect(res.body.error_message).toBeNull();
-    expect(res.body.store_id).toBe('store_01');
-    expect(res.body.shelf_id).toBe('shelf_A1');
+    expect(res.body.category).toBe('mi-goi');
+    expect(res.body.container).toBe('ke-a');
     expect(res.body.boxes).toHaveLength(2);
     expect(res.body.quantities).toHaveLength(1);
     expect(res.body.quantities[0].facing_count).toBe(2);
@@ -47,7 +47,7 @@ describe('POST /analyze', () => {
   test('status: failed -- ml-service call throws', async () => {
     mlService.predict.mockRejectedValue(new Error('ml-service responded 500'));
 
-    const res = await postAnalyze({ store_id: 'store_01', shelf_id: 'shelf_A1' });
+    const res = await postAnalyze({ category: 'mi-goi', container: 'ke-a' });
 
     expect(res.status).toBe(200);
     expect(res.body.status).toBe('failed');
@@ -68,7 +68,7 @@ describe('POST /analyze', () => {
       warnings: WARNINGS,
     });
 
-    const res = await postAnalyze({ store_id: 'store_01', shelf_id: 'shelf_A1' });
+    const res = await postAnalyze({ category: 'mi-goi', container: 'ke-a' });
 
     expect(res.status).toBe(200);
     expect(res.body.status).toBe('partial');
@@ -90,7 +90,7 @@ describe('POST /analyze', () => {
       warnings: WARNINGS,
     });
 
-    const res = await postAnalyze({ store_id: 'store_01', shelf_id: 'shelf_A1' });
+    const res = await postAnalyze({ category: 'mi-goi', container: 'ke-a' });
 
     const choco = res.body.quantities.find((q) => q.sku_id === 'choco_pie_org');
     expect(choco).toMatchObject({
@@ -125,7 +125,7 @@ describe('POST /analyze', () => {
       warnings: WARNINGS,
     });
 
-    const res = await postAnalyze({ store_id: 'store_01', shelf_id: 'shelf_A1' });
+    const res = await postAnalyze({ category: 'mi-goi', container: 'ke-a' });
 
     expect(res.status).toBe(200);
     expect(res.body.quantities).toHaveLength(1);
@@ -134,9 +134,21 @@ describe('POST /analyze', () => {
     expect(res.body.boxes).toHaveLength(2);
   });
 
-  test('rejects a request missing store_id/shelf_id/image with 400', async () => {
-    const res = await postAnalyze({ shelf_id: 'shelf_A1' });
+  test('rejects a request missing category/container/image with 400', async () => {
+    const res = await postAnalyze({ container: 'ke-a' });
     expect(res.status).toBe(400);
     expect(mlService.predict).not.toHaveBeenCalled();
+  });
+
+  test('rejects a category/container that does not exist or is not active with 400', async () => {
+    const res1 = await postAnalyze({ category: 'mi-goi', container: 'ke-b' }); // exists but not active
+    expect(res1.status).toBe(400);
+    expect(mlService.predict).not.toHaveBeenCalled();
+
+    const res2 = await postAnalyze({ category: 'banh-keo', container: 'ke-a' }); // category exists but not active
+    expect(res2.status).toBe(400);
+
+    const res3 = await postAnalyze({ category: 'khong-ton-tai', container: 'ke-a' }); // category doesn't exist
+    expect(res3.status).toBe(400);
   });
 });
