@@ -12,8 +12,8 @@ const STEPS = ['upload', 'crop', 'edit', 'confirm'];
 
 export default function ScanPage({ prefill }) {
   const [step, setStep] = useState('upload');
-  const [storeId, setStoreId] = useState(prefill?.storeId ?? '');
-  const [shelfId, setShelfId] = useState(prefill?.shelfId ?? '');
+  const [category, setCategory] = useState(prefill?.category ?? null);
+  const [container, setContainer] = useState(prefill?.container ?? null);
   const [originalFile, setOriginalFile] = useState(null);
   const [croppedImageBlob, setCroppedImageBlob] = useState(null);
   const [analyzeResult, setAnalyzeResult] = useState(null);
@@ -59,14 +59,14 @@ export default function ScanPage({ prefill }) {
     setAnalyzeResult({ scan_id: 'mock', boxes: mockBoxes, quantities: mockQuantities, image: { width: 4032, height: 3024 } });
     fetch('/mock-shelf.jpg').then((r) => r.blob()).then(setCroppedImageBlob);
     setQuantities(mockQuantities);
-    setStoreId('demo-store');
-    setShelfId('demo-shelf');
+    setCategory('demo-category');
+    setContainer('demo-container');
     setStep('edit');
   }, []);
 
-  function handleUploadNext({ storeId, shelfId, file }) {
-    setStoreId(storeId);
-    setShelfId(shelfId);
+  function handleUploadNext({ category, container, file }) {
+    setCategory(category);
+    setContainer(container);
     setOriginalFile(file);
     setAnalyzeError(null);
     setStep('crop');
@@ -77,8 +77,8 @@ export default function ScanPage({ prefill }) {
     setAnalyzeError(null);
     try {
       const result = await analyzeImage({
-        storeId,
-        shelfId,
+        category,
+        container,
         imageBlob: croppedBlob,
         filename: originalFile?.name ?? 'shelf.jpg',
       });
@@ -103,8 +103,8 @@ export default function ScanPage({ prefill }) {
     try {
       await confirmScan({
         scan_id: analyzeResult.scan_id,
-        store_id: storeId,
-        shelf_id: shelfId,
+        category,
+        container,
         quantities,
         total_value: computeTotalValue(quantities),
       });
@@ -118,8 +118,8 @@ export default function ScanPage({ prefill }) {
 
   function handleReset() {
     setStep('upload');
-    setStoreId('');
-    setShelfId('');
+    setCategory(null);
+    setContainer(null);
     setOriginalFile(null);
     setCroppedImageBlob(null);
     setAnalyzeResult(null);
@@ -133,7 +133,7 @@ export default function ScanPage({ prefill }) {
     <div className="mx-auto max-w-6xl">
       <StepIndicator steps={STEPS} current={step} />
       {step === 'upload' && (
-        <UploadStep onNext={handleUploadNext} initialStoreId={prefill?.storeId} initialShelfId={prefill?.shelfId} />
+        <UploadStep onNext={handleUploadNext} initialCategory={prefill?.category} initialContainer={prefill?.container} />
       )}
       {step === 'crop' && originalFile && (
         <CropStep
@@ -157,8 +157,8 @@ export default function ScanPage({ prefill }) {
       )}
       {step === 'confirm' && (
         <ConfirmStep
-          storeId={storeId}
-          shelfId={shelfId}
+          category={category}
+          container={container}
           quantities={quantities}
           confirming={confirming}
           confirmError={confirmError}

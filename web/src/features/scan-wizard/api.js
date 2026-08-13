@@ -1,7 +1,7 @@
-export async function analyzeImage({ storeId, shelfId, imageBlob, filename }) {
+export async function analyzeImage({ category, container, imageBlob, filename }) {
   const formData = new FormData();
-  formData.append('store_id', storeId);
-  formData.append('shelf_id', shelfId);
+  formData.append('category', category);
+  formData.append('container', container);
   formData.append('image', imageBlob, filename || 'shelf.jpg');
 
   const res = await fetch('/analyze', { method: 'POST', body: formData });
