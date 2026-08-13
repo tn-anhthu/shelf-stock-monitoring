@@ -9,25 +9,39 @@ function defaultDbPath() {
 
 function createScansDb(dbPath = defaultDbPath()) {
   const db = new Database(dbPath);
+
+  // Migrate a pre-rename DB in place (see
+  // docs/superpowers/specs/2026-08-13-category-container-naming-design.md §3)
+  // -- idempotent: only runs when the old column still exists, so re-running
+  // this against an already-migrated or brand-new DB is a no-op.
+  const existingColumns = db.prepare('PRAGMA table_info(scans)').all();
+  const hasOldColumn = existingColumns.some((col) => col.name === 'store_id');
+  if (hasOldColumn) {
+    db.exec(`
+      ALTER TABLE scans RENAME COLUMN store_id TO category;
+      ALTER TABLE scans RENAME COLUMN shelf_id TO container;
+    `);
+  }
+
   db.exec(`
     CREATE TABLE IF NOT EXISTS scans (
       scan_id TEXT PRIMARY KEY,
-      store_id TEXT NOT NULL,
-      shelf_id TEXT NOT NULL,
+      category TEXT NOT NULL,
+      container TEXT NOT NULL,
       quantities TEXT NOT NULL,
       total_value REAL NOT NULL,
       confirmed_at TEXT NOT NULL
     )
   `);
 
-  function insertScan({ scanId, storeId, shelfId, quantities, totalValue }) {
+  function insertScan({ scanId, category, container, quantities, totalValue }) {
     db.prepare(
-      `INSERT OR REPLACE INTO scans (scan_id, store_id, shelf_id, quantities, total_value, confirmed_at)
-       VALUES (@scanId, @storeId, @shelfId, @quantities, @totalValue, @confirmedAt)`,
+      `INSERT OR REPLACE INTO scans (scan_id, category, container, quantities, total_value, confirmed_at)
+       VALUES (@scanId, @category, @container, @quantities, @totalValue, @confirmedAt)`,
     ).run({
       scanId,
-      storeId,
-      shelfId,
+      category,
+      container,
       quantities: JSON.stringify(quantities),
       totalValue,
       confirmedAt: new Date().toISOString(),
@@ -40,12 +54,12 @@ function createScansDb(dbPath = defaultDbPath()) {
     return { ...row, quantities: JSON.parse(row.quantities) };
   }
 
-  function getLatestScan(storeId, shelfId) {
+  function getLatestScan(category, container) {
     const row = db
       .prepare(
-        'SELECT * FROM scans WHERE store_id = ? AND shelf_id = ? ORDER BY confirmed_at DESC LIMIT 1',
+        'SELECT * FROM scans WHERE category = ? AND container = ? ORDER BY confirmed_at DESC LIMIT 1',
       )
-      .get(storeId, shelfId);
+      .get(category, container);
     if (!row) return null;
     return { ...row, quantities: JSON.parse(row.quantities) };
   }

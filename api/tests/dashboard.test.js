@@ -82,8 +82,8 @@ describe('GET /dashboard', () => {
   test('returns computed payload for the latest scan on an active shelf', async () => {
     scansDb.insertScan({
       scanId: 'dash-scan-1',
-      storeId: 'mi-goi',
-      shelfId: 'ke-a',
+      category: 'mi-goi',
+      container: 'ke-a',
       quantities: QUANTITIES,
       totalValue: 1200,
     });
