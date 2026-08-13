@@ -1,6 +1,7 @@
 # ADR-002: `POST /analyze` request/response schema
 
 **Status:** Accepted (2026-07-28)
+**Cập nhật 2026-08-13:** field `store_id`/`shelf_id` trong toàn bộ schema dưới đây đã đổi tên thành `category`/`container` (xem `docs/superpowers/specs/2026-08-13-category-container-naming-design.md`) -- nội dung dưới đây đã cập nhật theo tên mới, không giữ tên cũ.
 **Liên quan:** [ADR-001](0001-migrate-node-api-frontend.md) (kiến trúc 3 tầng ml-service/api/web)
 
 ## Context
@@ -10,7 +11,7 @@ ADR-001 chốt trình tự triển khai "contract-first": chốt JSON schema c�
 ## Kiến trúc luồng dữ liệu
 
 ```
-web  --multipart(store_id, shelf_id, image)-->  api  POST /analyze
+web  --multipart(category, container, image)-->  api  POST /analyze
                                                    |
                                                    | multipart(image) --> ml-service POST /predict
                                                    |                       <-- { image, boxes }
@@ -19,7 +20,7 @@ web  --multipart(store_id, shelf_id, image)-->  api  POST /analyze
                                                    | aggregate boxes -> quantities theo sku_id
                                                    | tính flag_status, total_value
                                                    v
-                                                 { scan_id, store_id, shelf_id, timestamp, status,
+                                                 { scan_id, category, container, timestamp, status,
                                                    error_message, image, boxes, quantities, warnings,
                                                    total_value }
 ```
@@ -62,8 +63,8 @@ Response:
 ### Request
 
 `multipart/form-data`:
-- `store_id` (string, bắt buộc)
-- `shelf_id` (string, bắt buộc)
+- `category` (string, bắt buộc)
+- `container` (string, bắt buộc)
 - `image` (file, bắt buộc)
 
 Lý do chọn multipart thay vì base64 JSON: khớp trực tiếp với `<input type="file">` ở `web`, không cần encode/decode base64 ở client; `api` forward multipart nguyên trạng sang `ml-service`.
@@ -73,8 +74,8 @@ Lý do chọn multipart thay vì base64 JSON: khớp trực tiếp với `<input
 ```json
 {
   "scan_id": "string (uuid)",
-  "store_id": "string",
-  "shelf_id": "string",
+  "category": "string",
+  "container": "string",
   "timestamp": "ISO 8601 string",
   "status": "ok | failed | partial",
   "error_message": "string | null",
@@ -139,8 +140,8 @@ Lý do chọn multipart thay vì base64 JSON: khớp trực tiếp với `<input
 ```json
 {
   "scan_id": "a1b2c3d4-0000-0000-0000-000000000001",
-  "store_id": "store_01",
-  "shelf_id": "shelf_A1",
+  "category": "mi-goi",
+  "container": "ke-a",
   "timestamp": "2026-07-28T10:00:00.000Z",
   "status": "ok",
   "error_message": null,
@@ -161,8 +162,8 @@ Lý do chọn multipart thay vì base64 JSON: khớp trực tiếp với `<input
 ```json
 {
   "scan_id": "a1b2c3d4-0000-0000-0000-000000000002",
-  "store_id": "store_01",
-  "shelf_id": "shelf_A1",
+  "category": "mi-goi",
+  "container": "ke-a",
   "timestamp": "2026-07-28T10:05:00.000Z",
   "status": "failed",
   "error_message": "ml-service unreachable: connect ECONNREFUSED",
@@ -178,8 +179,8 @@ Lý do chọn multipart thay vì base64 JSON: khớp trực tiếp với `<input
 ```json
 {
   "scan_id": "a1b2c3d4-0000-0000-0000-000000000003",
-  "store_id": "store_01",
-  "shelf_id": "shelf_A1",
+  "category": "mi-goi",
+  "container": "ke-a",
   "timestamp": "2026-07-28T10:10:00.000Z",
   "status": "partial",
   "error_message": null,
