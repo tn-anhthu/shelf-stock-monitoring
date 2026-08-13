@@ -72,4 +72,34 @@ describe('POST /confirm', () => {
     });
     expect(res.status).toBe(400);
   });
+
+  test('rejects a category/container that does not exist or is not active with 400', async () => {
+    const res1 = await request(app).post('/confirm').send({
+      scan_id: 'scan-5',
+      category: 'mi-goi',
+      container: 'ke-b', // exists but not active
+      quantities: QUANTITIES,
+      total_value: 60000,
+    });
+    expect(res1.status).toBe(400);
+    expect(scansDb.getScanById('scan-5')).toBeNull();
+
+    const res2 = await request(app).post('/confirm').send({
+      scan_id: 'scan-6',
+      category: 'banh-keo', // category exists but not active
+      container: 'ke-a',
+      quantities: QUANTITIES,
+      total_value: 60000,
+    });
+    expect(res2.status).toBe(400);
+
+    const res3 = await request(app).post('/confirm').send({
+      scan_id: 'scan-7',
+      category: 'khong-ton-tai', // category doesn't exist
+      container: 'ke-a',
+      quantities: QUANTITIES,
+      total_value: 60000,
+    });
+    expect(res3.status).toBe(400);
+  });
 });

@@ -1,5 +1,6 @@
 const express = require('express');
 const { scansDb } = require('../services/scansDb');
+const { isActiveShelf } = require('../config/shelfRegistry');
 
 const router = express.Router();
 
@@ -16,6 +17,10 @@ router.post('/confirm', (req, res) => {
     return res.status(400).json({
       error: 'scan_id, category, container, and a non-empty quantities array are required',
     });
+  }
+
+  if (!isActiveShelf(category, container)) {
+    return res.status(400).json({ error: 'category/container is missing or not active' });
   }
 
   scansDb.insertScan({ scanId, category, container, quantities, totalValue: totalValue ?? 0 });
