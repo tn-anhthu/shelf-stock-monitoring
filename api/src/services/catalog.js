@@ -14,6 +14,7 @@ function loadCatalog(catalogPath = CATALOG_PATH) {
   for (const row of rows) {
     catalog.set(row.sku_id, {
       name: row.name,
+      category: row['Nhóm'],
       price: Number(row.price),
       shelfFullQty: Number(row.shelf_full_qty),
     });

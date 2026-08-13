@@ -13,7 +13,7 @@ function StepIcon({ status }) {
   if (status === 'done') {
     return (
       <span className={ICON_BASE}>
-        <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" className="text-text-muted">
+        <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" className="text-text-secondary">
           <path d="M4 10l4 4 8-8" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
       </span>
@@ -51,7 +51,7 @@ export default function AnalyzingModal({ open }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/40 p-4">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl">
+      <div className="w-full max-w-sm border border-card-border bg-page p-6">
         <div className="flex flex-col items-center text-center">
           <span className="h-8 w-8 animate-spin rounded-full border-2 border-card-border border-t-ink" />
           <p className="mt-3 font-heading text-base font-semibold text-ink">{getAnalyzingCurrentStepText(elapsedMs)}</p>
@@ -65,10 +65,10 @@ export default function AnalyzingModal({ open }) {
               <span
                 className={`text-sm ${
                   statuses[index] === 'done'
-                    ? 'text-text-muted line-through'
+                    ? 'text-text-secondary line-through'
                     : statuses[index] === 'current'
                       ? 'font-medium text-ink'
-                      : 'text-text-muted'
+                      : 'text-text-secondary'
                 }`}
               >
                 {label}
@@ -77,7 +77,7 @@ export default function AnalyzingModal({ open }) {
           ))}
         </ol>
 
-        <p className="mt-4 text-center text-xs text-text-muted">{formatElapsed(elapsedMs)}</p>
+        <p className="mt-4 text-center text-xs text-text-secondary">{formatElapsed(elapsedMs)}</p>
       </div>
     </div>
   );

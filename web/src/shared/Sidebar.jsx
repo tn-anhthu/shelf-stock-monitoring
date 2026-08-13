@@ -1,10 +1,15 @@
 import { ScanIcon, DashboardIcon, SidebarToggleIcon } from './ui/icons.jsx';
 import headerLogo from '../assets/header-logo.svg';
 
-export default function Sidebar({ collapsed, onToggle }) {
+const NAV_ITEMS = [
+  { id: 'scan', label: 'Scan', Icon: ScanIcon },
+  { id: 'inventory', label: 'Inventory', Icon: DashboardIcon },
+];
+
+export default function Sidebar({ collapsed, onToggle, activeTab, onSelectTab }) {
   const navItemClass = collapsed
-    ? 'flex items-center justify-center rounded-lg py-2.5'
-    : 'flex items-center gap-2 rounded-lg px-3 py-2.5';
+    ? 'flex w-full items-center justify-center rounded-lg py-2.5'
+    : 'flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left';
 
   return (
     <aside
@@ -35,21 +40,22 @@ export default function Sidebar({ collapsed, onToggle }) {
         </button>
       </div>
       <nav className="space-y-1">
-        <div className={`${navItemClass} bg-ink text-base font-medium text-white`}>
-          <ScanIcon />
-          {!collapsed && 'Scan'}
-        </div>
-        <div
-          className={`${navItemClass} cursor-not-allowed text-base text-text-muted`}
-          title="Sắp có"
-        >
-          <DashboardIcon />
-          {!collapsed && (
-            <>
-              Dashboard <span className="text-xs">(sắp có)</span>
-            </>
-          )}
-        </div>
+        {NAV_ITEMS.map(({ id, label, Icon }) => {
+          const isActive = activeTab === id;
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => onSelectTab(id)}
+              className={`${navItemClass} text-base ${
+                isActive ? 'bg-ink font-medium text-white' : 'text-text-secondary hover:bg-page hover:text-ink'
+              }`}
+            >
+              <Icon />
+              {!collapsed && label}
+            </button>
+          );
+        })}
       </nav>
     </aside>
   );

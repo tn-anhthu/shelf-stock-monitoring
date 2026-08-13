@@ -43,10 +43,11 @@ data/scan_viz/*
 !data/scan_viz/review.xlsx
 
 # Dev tooling (local-only)
-.claude/worktrees/
+.claude/
 .worktrees/
 docs/superpowers/
 .superpowers/
+.impeccable/
 
 # ml-service / api (ADR-001)
 .venv-ml-service/

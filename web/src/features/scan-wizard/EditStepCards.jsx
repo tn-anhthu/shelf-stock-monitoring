@@ -1,35 +1,42 @@
-import StatusChip from '../../shared/ui/StatusChip.jsx';
-import Card from '../../shared/ui/Card.jsx';
+import { IconClose } from '../../shared/ui/icons.jsx';
 
-const currency = (n) => n.toLocaleString('vi-VN') + ' đ';
+function StatusText({ status }) {
+  if (status === 'ok') return <span className="font-bold text-status-ok">Đủ</span>;
+  if (status === 'low') return <span className="font-bold text-status-low">Sắp hết</span>;
+  if (status === 'out') {
+    return (
+      <span className="inline-block rounded-sm border border-status-out px-1.5 py-0.5 text-xs font-black uppercase tracking-wide text-status-out">
+        Hết hàng
+      </span>
+    );
+  }
+  return <span className="text-text-muted">—</span>;
+}
 
 export default function EditStepCards({ quantities, onQuantityChange, onRemoveRow, hoveredSkuId, onRowHover }) {
   return (
-    <div className="space-y-3">
+    <div className="border-t border-ink">
       {quantities.map((q, index) => {
-        const depth = q.depth ?? 1;
         const isHovered = hoveredSkuId === q.sku_id;
         return (
-          <Card
+          <div
             key={`${q.sku_id}-${index}`}
             onMouseEnter={() => onRowHover(q.sku_id)}
             onMouseLeave={() => onRowHover(null)}
-            className={isHovered ? 'border-ink bg-page' : ''}
+            className={`border-b border-card-border py-3 ${isHovered ? 'bg-page' : ''}`}
           >
             <div className="flex items-start justify-between gap-2">
               <div>
                 <p className="font-heading text-sm font-medium text-ink">{q.sku_name}</p>
-                <p className="text-xs text-text-muted">
-                  {q.sku_id} · {currency(q.unit_price)}
-                </p>
+                <p className="text-xs text-text-secondary">{q.sku_id}</p>
               </div>
-              <StatusChip status={q.flag_status} />
+              <StatusText status={q.flag_status} />
             </div>
             <div className="mt-3 flex items-center gap-2">
               <button
                 type="button"
                 onClick={() => onQuantityChange(index, String(Math.max(0, q.facing_count - 1)))}
-                className="h-7 w-7 rounded-md border border-card-border bg-white"
+                className="h-7 w-7 border border-card-border text-ink"
               >
                 −
               </button>
@@ -39,18 +46,20 @@ export default function EditStepCards({ quantities, onQuantityChange, onRemoveRo
               <button
                 type="button"
                 onClick={() => onQuantityChange(index, String(q.facing_count + 1))}
-                className="h-7 w-7 rounded-md border border-card-border bg-white"
+                className="h-7 w-7 border border-card-border text-ink"
               >
                 +
               </button>
-              <span className="ml-auto text-sm text-text-secondary">
-                {currency(q.facing_count * depth * q.unit_price)}
-              </span>
-              <button type="button" onClick={() => onRemoveRow(index)} className="text-status-out-text" aria-label="Xóa dòng">
-                ✕
+              <button
+                type="button"
+                onClick={() => onRemoveRow(index)}
+                className="ml-auto text-status-out"
+                aria-label="Xóa dòng"
+              >
+                <IconClose />
               </button>
             </div>
-          </Card>
+          </div>
         );
       })}
     </div>

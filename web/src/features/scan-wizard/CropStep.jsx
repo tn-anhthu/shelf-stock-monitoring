@@ -28,9 +28,7 @@ export default function CropStep({ originalFile, analyzing, analyzeError, onAnal
     <div className="space-y-4">
       <h2 className="font-heading text-lg font-semibold text-ink">2. Chỉnh vùng kệ hàng</h2>
 
-      {analyzeError && (
-        <p className="rounded-lg bg-status-out-bg px-3 py-2 text-sm text-status-out-text">{analyzeError}</p>
-      )}
+      {analyzeError && <p className="text-sm text-status-out">{analyzeError}</p>}
 
       <div className="relative">
         {imageUrl && (

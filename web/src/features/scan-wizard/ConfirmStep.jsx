@@ -1,7 +1,4 @@
-import { computeTotalValue } from './quantities.js';
 import Button from '../../shared/ui/Button.jsx';
-
-const currency = (n) => n.toLocaleString('vi-VN') + ' đ';
 
 export default function ConfirmStep({
   storeId,
@@ -13,12 +10,10 @@ export default function ConfirmStep({
   onConfirm,
   onReset,
 }) {
-  const totalValue = computeTotalValue(quantities);
-
   if (confirmed) {
     return (
       <div className="space-y-4">
-        <p className="rounded-lg bg-status-ok-bg px-4 py-3 text-status-ok-text">
+        <p className="font-medium text-status-ok">
           Đã lưu kết quả quét kệ {shelfId} tại {storeId}.
         </p>
         <Button type="button" variant="outline" onClick={onReset}>
@@ -37,10 +32,9 @@ export default function ConfirmStep({
 
       <table className="w-full border-collapse text-sm">
         <thead>
-          <tr className="border-b border-card-border text-left text-text-muted">
-            <th className="py-2 font-medium">Sản phẩm</th>
-            <th className="font-medium">Số lượng</th>
-            <th className="font-medium">Thành tiền</th>
+          <tr className="border-b border-ink text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">
+            <th className="py-2 font-semibold">Sản phẩm</th>
+            <th className="font-semibold">Số lượng</th>
           </tr>
         </thead>
         <tbody>
@@ -48,23 +42,27 @@ export default function ConfirmStep({
             <tr key={`${q.sku_id}-${index}`} className="border-b border-card-border">
               <td className="py-2 text-ink">{q.sku_name}</td>
               <td className="text-ink">{q.facing_count}</td>
-              <td className="text-ink">{currency(q.facing_count * (q.depth ?? 1) * q.unit_price)}</td>
             </tr>
           ))}
         </tbody>
       </table>
 
-      <p className="font-heading text-lg font-semibold text-ink">Tổng giá trị: {currency(totalValue)}</p>
+      <div className="space-y-3 border-t border-card-border pt-3">
+        {confirmError && (
+          <p className="text-status-out">
+            Lưu thất bại: {confirmError} — dữ liệu đã sửa vẫn được giữ nguyên, có thể thử lại.
+          </p>
+        )}
 
-      {confirmError && (
-        <p className="rounded-lg bg-status-out-bg px-3 py-2 text-status-out-text">
-          Lưu thất bại: {confirmError} — dữ liệu đã sửa vẫn được giữ nguyên, có thể thử lại.
-        </p>
-      )}
-
-      <Button type="button" onClick={onConfirm} disabled={confirming} className="w-full md:w-auto">
-        {confirming ? 'Đang lưu…' : confirmError ? 'Thử lại' : 'Xác nhận'}
-      </Button>
+        <button
+          type="button"
+          onClick={onConfirm}
+          disabled={confirming}
+          className="flex w-full items-center justify-center border-b-2 border-ink pb-2 text-lg font-heading font-semibold text-ink transition disabled:cursor-not-allowed disabled:opacity-50 md:w-auto md:justify-start"
+        >
+          {confirming ? 'Đang lưu…' : confirmError ? 'Thử lại' : 'Xác nhận'}
+        </button>
+      </div>
     </div>
   );
 }

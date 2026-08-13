@@ -40,7 +40,17 @@ function createScansDb(dbPath = defaultDbPath()) {
     return { ...row, quantities: JSON.parse(row.quantities) };
   }
 
-  return { db, insertScan, getScanById };
+  function getLatestScan(storeId, shelfId) {
+    const row = db
+      .prepare(
+        'SELECT * FROM scans WHERE store_id = ? AND shelf_id = ? ORDER BY confirmed_at DESC LIMIT 1',
+      )
+      .get(storeId, shelfId);
+    if (!row) return null;
+    return { ...row, quantities: JSON.parse(row.quantities) };
+  }
+
+  return { db, insertScan, getScanById, getLatestScan };
 }
 
 const scansDb = createScansDb();

@@ -10,10 +10,10 @@ import { useObjectUrl } from '../shared/useObjectUrl.js';
 
 const STEPS = ['upload', 'crop', 'edit', 'confirm'];
 
-export default function ScanPage() {
+export default function ScanPage({ prefill }) {
   const [step, setStep] = useState('upload');
-  const [storeId, setStoreId] = useState('');
-  const [shelfId, setShelfId] = useState('');
+  const [storeId, setStoreId] = useState(prefill?.storeId ?? '');
+  const [shelfId, setShelfId] = useState(prefill?.shelfId ?? '');
   const [originalFile, setOriginalFile] = useState(null);
   const [croppedImageBlob, setCroppedImageBlob] = useState(null);
   const [analyzeResult, setAnalyzeResult] = useState(null);
@@ -29,6 +29,39 @@ export default function ScanPage() {
 
   useEffect(() => {
     fetchCatalog().then(setCatalog).catch(() => setCatalog([]));
+  }, []);
+
+  // TEMP DEV MOCK — remove before shipping. ?mock=edit jumps straight to the
+  // Edit step with fake detection data so the UI can be checked without a
+  // live ml-service run.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('mock') !== 'edit') return;
+    const mockQuantities = [
+      { sku_id: 'choco_pie_org', sku_name: 'Bánh chocopie Orion hộp 217.8g (6 cái)', facing_count: 4, depth: 2, total_quantity: 8, shelf_full_qty: 10, unit_price: 30000, subtotal: 240000, flag_status: 'ok' },
+      { sku_id: 'choco_pie_dark', sku_name: 'Bánh chocopie Orion Dark vị ca cao hộp 180g (6 cái)', facing_count: 2, depth: 2, total_quantity: 4, shelf_full_qty: 10, unit_price: 34000, subtotal: 136000, flag_status: 'low' },
+      { sku_id: 'karo_org', sku_name: 'Bánh trứng tươi chà bông Karo Richy túi 156g', facing_count: 0, depth: 1, total_quantity: 0, shelf_full_qty: 10, unit_price: 41000, subtotal: 0, flag_status: 'out' },
+      { sku_id: 'karo_phomai', sku_name: 'Bánh trứng tươi phô mai hoàng kim Karo Richy túi 156g', facing_count: 3, depth: 1, total_quantity: 3, shelf_full_qty: 10, unit_price: 41000, subtotal: 123000, flag_status: null },
+    ];
+    const mockBoxes = [
+      { box_id: 'b1', bbox: [230, 350, 900, 900], type: 'product', sku_id: 'choco_pie_org', confidence: 0.94, is_unknown: false, excluded_from_count: false, needs_review: false },
+      { box_id: 'b2', bbox: [950, 350, 1600, 900], type: 'product', sku_id: 'choco_pie_dark', confidence: 0.88, is_unknown: false, excluded_from_count: false, needs_review: false },
+      { box_id: 'b3', bbox: [1650, 350, 2300, 900], type: 'gap', sku_id: 'karo_org', confidence: 0.5, is_unknown: false, excluded_from_count: true, needs_review: false },
+      { box_id: 'b4', bbox: [230, 950, 900, 1500], type: 'product', sku_id: 'karo_phomai', confidence: 0.62, is_unknown: false, excluded_from_count: false, needs_review: false },
+      { box_id: 'b5', bbox: [950, 950, 1600, 1500], type: 'product', sku_id: null, confidence: 0.4, is_unknown: true, excluded_from_count: false, needs_review: false },
+      { box_id: 'b6', bbox: [1650, 950, 2300, 1500], type: 'product', sku_id: null, confidence: 0.3, is_unknown: false, excluded_from_count: true, needs_review: true },
+    ];
+    setCatalog((prev) => (prev.length ? prev : [
+      { sku_id: 'choco_pie_org', name: 'Bánh chocopie Orion hộp 217.8g (6 cái)', price: 30000, shelf_full_qty: 10 },
+      { sku_id: 'choco_pie_dark', name: 'Bánh chocopie Orion Dark vị ca cao hộp 180g (6 cái)', price: 34000, shelf_full_qty: 10 },
+      { sku_id: 'karo_org', name: 'Bánh trứng tươi chà bông Karo Richy túi 156g', price: 41000, shelf_full_qty: 10 },
+      { sku_id: 'karo_phomai', name: 'Bánh trứng tươi phô mai hoàng kim Karo Richy túi 156g', price: 41000, shelf_full_qty: 10 },
+    ]));
+    setAnalyzeResult({ scan_id: 'mock', boxes: mockBoxes, quantities: mockQuantities, image: { width: 4032, height: 3024 } });
+    fetch('/mock-shelf.jpg').then((r) => r.blob()).then(setCroppedImageBlob);
+    setQuantities(mockQuantities);
+    setStoreId('demo-store');
+    setShelfId('demo-shelf');
+    setStep('edit');
   }, []);
 
   function handleUploadNext({ storeId, shelfId, file }) {
@@ -99,7 +132,9 @@ export default function ScanPage() {
   return (
     <div className="mx-auto max-w-6xl">
       <StepIndicator steps={STEPS} current={step} />
-      {step === 'upload' && <UploadStep onNext={handleUploadNext} />}
+      {step === 'upload' && (
+        <UploadStep onNext={handleUploadNext} initialStoreId={prefill?.storeId} initialShelfId={prefill?.shelfId} />
+      )}
       {step === 'crop' && originalFile && (
         <CropStep
           originalFile={originalFile}

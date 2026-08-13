@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { computeTotalValue, isDuplicateSku } from './quantities.js';
+import { isDuplicateSku } from './quantities.js';
 import EditStepTable from './EditStepTable.jsx';
 import EditStepCards from './EditStepCards.jsx';
 import BboxOverlay from './BboxOverlay.jsx';
@@ -20,7 +20,7 @@ export default function EditStep({
   onNext,
 }) {
   const [hoveredSkuId, setHoveredSkuId] = useState(null);
-  const [leftWidth, setLeftWidth] = useState(50);
+  const [leftWidth, setLeftWidth] = useState(38);
   const containerRef = useRef(null);
   const draggingRef = useRef(false);
 
@@ -42,7 +42,6 @@ export default function EditStep({
     };
   }, []);
 
-  const totalValue = computeTotalValue(quantities);
   const availableToAdd = catalog.filter((item) => !isDuplicateSku(quantities, item.sku_id));
   const needsReviewCount = boxes.filter((box) => box.excluded_from_count && box.needs_review).length;
 
@@ -103,12 +102,12 @@ export default function EditStep({
   }
 
   return (
-    <div className="space-y-4 pb-32 md:pb-4">
+    <div className="space-y-4 pb-4">
       <h2 className="font-heading text-lg font-semibold text-ink">3. Kiểm tra & sửa số lượng</h2>
 
       {needsReviewCount > 0 && (
-        <p className="rounded-lg bg-status-out-bg px-3 py-2 text-sm text-status-out-text">
-          ⚠️ {needsReviewCount} vùng cần kiểm tra kỹ (có thể sai loại sản phẩm) — xem viền tím trên ảnh bên trái.
+        <p className="text-sm font-medium text-status-out">
+          {needsReviewCount} vùng cần kiểm tra kỹ (có thể sai loại sản phẩm) — xem viền tím trên ảnh bên trái.
         </p>
       )}
 
@@ -128,7 +127,7 @@ export default function EditStep({
           onMouseDown={() => {
             draggingRef.current = true;
           }}
-          className="w-1 shrink-0 cursor-col-resize rounded bg-card-border hover:bg-ink"
+          className="w-1 shrink-0 cursor-col-resize bg-card-border hover:bg-ink"
         />
         <div style={{ width: `${100 - leftWidth}%` }} className="min-w-0 pl-3">
           <EditStepTable
@@ -174,15 +173,11 @@ export default function EditStep({
         </Button>
       </div>
 
-      <div className="fixed inset-x-0 bottom-16 border-t border-card-border bg-white p-3 md:static md:border-0 md:bg-transparent md:p-0">
-        <p className="font-heading text-lg font-semibold text-ink">Tổng giá trị: {totalValue.toLocaleString('vi-VN')} đ</p>
-      </div>
-
-      <details className="rounded-lg border border-card-border p-3">
+      <details className="border-t border-card-border pt-3">
         <summary className="cursor-pointer font-medium text-ink">Xem chi tiết kỹ thuật</summary>
         <table className="mt-2 w-full text-xs">
           <thead>
-            <tr className="text-left">
+            <tr className="border-b border-card-border text-left text-text-secondary">
               <th>box_id</th>
               <th>type</th>
               <th>sku_id</th>

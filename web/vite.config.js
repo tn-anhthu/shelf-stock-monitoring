@@ -9,6 +9,8 @@ export default defineConfig({
       '/analyze': 'http://127.0.0.1:3000',
       '/catalog': 'http://127.0.0.1:3000',
       '/confirm': 'http://127.0.0.1:3000',
+      '/shelves': 'http://127.0.0.1:3000',
+      '/dashboard': 'http://127.0.0.1:3000',
     },
   },
   test: {

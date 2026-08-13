@@ -1,3 +1,5 @@
+import { IconCheck } from '../../shared/ui/icons.jsx';
+
 const LABELS = {
   upload: 'Upload',
   crop: 'Crop',
@@ -17,12 +19,12 @@ export default function StepIndicator({ steps, current }) {
             <div className="flex flex-col items-center gap-1">
               <div
                 className={`flex h-7 w-7 items-center justify-center rounded-full font-heading text-xs font-semibold ${
-                  isDone || isCurrent ? 'bg-ink text-white' : 'bg-page text-text-muted'
+                  isDone || isCurrent ? 'bg-ink text-page' : 'bg-page text-text-secondary border border-card-border'
                 }`}
               >
-                {isDone ? '✓' : index + 1}
+                {isDone ? <IconCheck /> : index + 1}
               </div>
-              <span className={`text-xs ${isCurrent ? 'font-medium text-ink' : 'text-text-muted'}`}>
+              <span className={`text-xs ${isCurrent ? 'font-medium text-ink' : 'text-text-secondary'}`}>
                 {LABELS[step]}
               </span>
             </div>

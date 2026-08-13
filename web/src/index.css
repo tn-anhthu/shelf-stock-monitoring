@@ -14,6 +14,18 @@
   --color-status-out-bg: #FCEBEB;
   --color-status-out-text: #501313;
 
+  --color-status-ok: #15803D;
+  --color-status-low: #B45309;
+  --color-status-out: #DC2626;
+
+  /* Vivid variant reserved for the StatusBar proportional segments only — a deliberate
+     Full-palette exception to the Restrained strategy everywhere else (Inventory tab). */
+  --color-status-ok-bar: #37B535;
+  --color-status-low-bar: #DB922C;
+  --color-status-out-bar: #C91E1E;
+
+  --color-border-strong: #CBD5E1;
+
   --font-heading: "Be Vietnam Pro", sans-serif;
 }
 

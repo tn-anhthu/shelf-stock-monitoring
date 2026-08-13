@@ -19,6 +19,23 @@ export async function fetchCatalog() {
   return res.json();
 }
 
+export async function fetchShelves() {
+  const res = await fetch('/shelves');
+  if (!res.ok) {
+    throw new Error(`shelves request failed: ${res.status}`);
+  }
+  return res.json();
+}
+
+export async function fetchDashboard({ category, container }) {
+  const params = new URLSearchParams({ category, container });
+  const res = await fetch(`/dashboard?${params}`);
+  if (!res.ok) {
+    throw new Error(`dashboard request failed: ${res.status}`);
+  }
+  return res.json();
+}
+
 export async function confirmScan(payload) {
   const res = await fetch('/confirm', {
     method: 'POST',

@@ -1,7 +1,7 @@
 export default function Input({ className = '', ...props }) {
   return (
     <input
-      className={`w-full rounded-lg border border-card-border px-3 py-2 text-sm focus:border-ink focus:outline-none ${className}`}
+      className={`w-full border-0 border-b border-card-border bg-transparent px-0 py-2 text-sm text-ink focus:border-ink focus:outline-none ${className}`}
       {...props}
     />
   );
