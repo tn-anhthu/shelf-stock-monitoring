@@ -1,13 +1,15 @@
 import { useEffect, useRef, useState } from 'react';
 import { isHeic, heicTo } from 'heic-to';
 import Button from '../../shared/ui/Button.jsx';
-import Input from '../../shared/ui/Input.jsx';
 import { IconClose } from '../../shared/ui/icons.jsx';
 import { useObjectUrl } from '../../shared/useObjectUrl.js';
+import { fetchShelves } from './api.js';
+import CategoryContainerPicker from '../inventory/CategoryContainerPicker.jsx';
 
-export default function UploadStep({ onNext, initialStoreId = '', initialShelfId = '' }) {
-  const [storeId, setStoreId] = useState(initialStoreId);
-  const [shelfId, setShelfId] = useState(initialShelfId);
+export default function UploadStep({ onNext, initialCategory = null, initialContainer = null }) {
+  const [categories, setCategories] = useState(null);
+  const [category, setCategory] = useState(initialCategory);
+  const [container, setContainer] = useState(initialContainer);
   const [file, setFile] = useState(null);
   const [converting, setConverting] = useState(false);
   const [convertError, setConvertError] = useState(null);
@@ -16,6 +18,27 @@ export default function UploadStep({ onNext, initialStoreId = '', initialShelfId
   const cameraInputRef = useRef(null);
   const galleryInputRef = useRef(null);
   const photoTipsRef = useRef(null);
+
+  useEffect(() => {
+    fetchShelves()
+      .then(({ categories: cats }) => {
+        setCategories(cats);
+        if (!initialCategory) {
+          const firstActiveCategory = cats.find((c) => c.active);
+          const firstActiveContainer = firstActiveCategory?.containers.find((c) => c.active);
+          setCategory(firstActiveCategory?.slug ?? null);
+          setContainer(firstActiveContainer?.id ?? null);
+        }
+      })
+      .catch(() => setCategories([]));
+  }, []);
+
+  function handleCategoryChange(slug) {
+    setCategory(slug);
+    const nextCategory = categories.find((c) => c.slug === slug);
+    const firstActiveContainer = nextCategory?.containers.find((c) => c.active);
+    setContainer(firstActiveContainer?.id ?? null);
+  }
 
   useEffect(() => {
     if (!showPhotoTips) return;
@@ -32,7 +55,7 @@ export default function UploadStep({ onNext, initialStoreId = '', initialShelfId
     };
   }, [showPhotoTips]);
 
-  const canSubmit = storeId.trim() && shelfId.trim() && file && !converting;
+  const canSubmit = Boolean(category) && Boolean(container) && file && !converting;
 
   async function handleFileChange(event) {
     const picked = event.target.files?.[0] ?? null;
@@ -61,34 +84,24 @@ export default function UploadStep({ onNext, initialStoreId = '', initialShelfId
   function handleSubmit(event) {
     event.preventDefault();
     if (!canSubmit) return;
-    onNext({ storeId: storeId.trim(), shelfId: shelfId.trim(), file });
+    onNext({ category, container, file });
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
       <h2 className="font-heading text-lg font-semibold text-ink">1. Chọn ảnh kệ hàng</h2>
 
-      <label className="block">
-        <span className="text-sm font-medium text-ink">Store ID</span>
-        <Input
-          type="text"
-          value={storeId}
-          onChange={(e) => setStoreId(e.target.value)}
-          required
-          className="mt-1"
+      {!categories ? (
+        <p className="text-sm text-text-muted">Đang tải danh mục…</p>
+      ) : (
+        <CategoryContainerPicker
+          categories={categories}
+          category={category}
+          container={container}
+          onCategoryChange={handleCategoryChange}
+          onContainerChange={setContainer}
         />
-      </label>
-
-      <label className="block">
-        <span className="text-sm font-medium text-ink">Shelf ID</span>
-        <Input
-          type="text"
-          value={shelfId}
-          onChange={(e) => setShelfId(e.target.value)}
-          required
-          className="mt-1"
-        />
-      </label>
+      )}
 
       <div>
         <div className="relative flex items-center gap-1.5" ref={photoTipsRef}>
