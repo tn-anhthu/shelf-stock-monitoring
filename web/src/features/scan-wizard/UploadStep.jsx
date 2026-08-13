@@ -5,11 +5,13 @@ import { IconClose } from '../../shared/ui/icons.jsx';
 import { useObjectUrl } from '../../shared/useObjectUrl.js';
 import { fetchShelves } from './api.js';
 import CategoryContainerPicker from '../inventory/CategoryContainerPicker.jsx';
+import ErrorBanner from '../inventory/ErrorBanner.jsx';
 
 export default function UploadStep({ onNext, initialCategory = null, initialContainer = null }) {
   const [categories, setCategories] = useState(null);
   const [category, setCategory] = useState(initialCategory);
   const [container, setContainer] = useState(initialContainer);
+  const [shelvesError, setShelvesError] = useState(null);
   const [file, setFile] = useState(null);
   const [converting, setConverting] = useState(false);
   const [convertError, setConvertError] = useState(null);
@@ -19,7 +21,8 @@ export default function UploadStep({ onNext, initialCategory = null, initialCont
   const galleryInputRef = useRef(null);
   const photoTipsRef = useRef(null);
 
-  useEffect(() => {
+  function loadShelves() {
+    setShelvesError(null);
     fetchShelves()
       .then(({ categories: cats }) => {
         setCategories(cats);
@@ -30,7 +33,11 @@ export default function UploadStep({ onNext, initialCategory = null, initialCont
           setContainer(firstActiveContainer?.id ?? null);
         }
       })
-      .catch(() => setCategories([]));
+      .catch((err) => setShelvesError(err.message));
+  }
+
+  useEffect(() => {
+    loadShelves();
   }, []);
 
   function handleCategoryChange(slug) {
@@ -91,7 +98,9 @@ export default function UploadStep({ onNext, initialCategory = null, initialCont
     <form onSubmit={handleSubmit} className="space-y-4">
       <h2 className="font-heading text-lg font-semibold text-ink">1. Chọn ảnh kệ hàng</h2>
 
-      {!categories ? (
+      {shelvesError ? (
+        <ErrorBanner message={shelvesError} onRetry={loadShelves} />
+      ) : !categories ? (
         <p className="text-sm text-text-muted">Đang tải danh mục…</p>
       ) : (
         <CategoryContainerPicker
