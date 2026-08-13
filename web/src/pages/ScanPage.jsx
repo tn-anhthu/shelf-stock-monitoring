@@ -14,6 +14,8 @@ export default function ScanPage({ prefill }) {
   const [step, setStep] = useState('upload');
   const [category, setCategory] = useState(prefill?.category ?? null);
   const [container, setContainer] = useState(prefill?.container ?? null);
+  const [categoryName, setCategoryName] = useState(null);
+  const [containerLabel, setContainerLabel] = useState(null);
   const [originalFile, setOriginalFile] = useState(null);
   const [croppedImageBlob, setCroppedImageBlob] = useState(null);
   const [analyzeResult, setAnalyzeResult] = useState(null);
@@ -61,12 +63,16 @@ export default function ScanPage({ prefill }) {
     setQuantities(mockQuantities);
     setCategory('demo-category');
     setContainer('demo-container');
+    setCategoryName('Danh mục demo');
+    setContainerLabel('Kệ demo');
     setStep('edit');
   }, []);
 
-  function handleUploadNext({ category, container, file }) {
+  function handleUploadNext({ category, container, categoryName, containerLabel, file }) {
     setCategory(category);
     setContainer(container);
+    setCategoryName(categoryName);
+    setContainerLabel(containerLabel);
     setOriginalFile(file);
     setAnalyzeError(null);
     setStep('crop');
@@ -120,6 +126,8 @@ export default function ScanPage({ prefill }) {
     setStep('upload');
     setCategory(null);
     setContainer(null);
+    setCategoryName(null);
+    setContainerLabel(null);
     setOriginalFile(null);
     setCroppedImageBlob(null);
     setAnalyzeResult(null);
@@ -157,8 +165,8 @@ export default function ScanPage({ prefill }) {
       )}
       {step === 'confirm' && (
         <ConfirmStep
-          category={category}
-          container={container}
+          categoryName={categoryName}
+          containerLabel={containerLabel}
           quantities={quantities}
           confirming={confirming}
           confirmError={confirmError}

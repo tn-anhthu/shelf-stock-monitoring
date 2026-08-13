@@ -1,8 +1,8 @@
 import Button from '../../shared/ui/Button.jsx';
 
 export default function ConfirmStep({
-  category,
-  container,
+  categoryName,
+  containerLabel,
   quantities,
   confirming,
   confirmError,
@@ -14,7 +14,7 @@ export default function ConfirmStep({
     return (
       <div className="space-y-4">
         <p className="font-medium text-status-ok">
-          Đã lưu kết quả quét container {container} tại category {category}.
+          Đã lưu kết quả quét kệ {containerLabel} thuộc {categoryName}.
         </p>
         <Button type="button" variant="outline" onClick={onReset}>
           Quét kệ khác
@@ -27,7 +27,7 @@ export default function ConfirmStep({
     <div className="space-y-4">
       <h2 className="font-heading text-lg font-semibold text-ink">4. Xác nhận</h2>
       <p className="text-text-secondary">
-        Category: {category} — Container: {container}
+        {categoryName} — {containerLabel}
       </p>
 
       <table className="w-full border-collapse text-sm">

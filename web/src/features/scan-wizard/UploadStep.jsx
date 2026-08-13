@@ -91,7 +91,15 @@ export default function UploadStep({ onNext, initialCategory = null, initialCont
   function handleSubmit(event) {
     event.preventDefault();
     if (!canSubmit) return;
-    onNext({ category, container, file });
+    const selectedCategory = categories?.find((c) => c.slug === category);
+    const selectedContainer = selectedCategory?.containers.find((c) => c.id === container);
+    onNext({
+      category,
+      container,
+      categoryName: selectedCategory?.name ?? category,
+      containerLabel: selectedContainer?.label ?? container,
+      file,
+    });
   }
 
   return (
