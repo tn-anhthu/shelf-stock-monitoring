@@ -63,7 +63,7 @@ export default function InventoryPage({ onScanShelf }) {
         {selectedCategory && selectedContainer && (
           <button
             type="button"
-            onClick={() => onScanShelf({ storeId: category, shelfId: container })}
+            onClick={() => onScanShelf({ category, container })}
             className="whitespace-nowrap text-xs text-text-secondary underline decoration-1 underline-offset-2 hover:text-ink"
           >
             Scan lại kệ này
@@ -88,7 +88,7 @@ export default function InventoryPage({ onScanShelf }) {
           {!loading && error && <ErrorBanner message={error} onRetry={loadDashboard} />}
 
           {!loading && !error && dashboard && !dashboard.has_data && (
-            <EmptyState onScanNow={() => onScanShelf({ storeId: category, shelfId: container })} />
+            <EmptyState onScanNow={() => onScanShelf({ category, container })} />
           )}
 
           {!loading && !error && dashboard?.has_data && (
