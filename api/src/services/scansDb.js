@@ -18,8 +18,10 @@ function createScansDb(dbPath = defaultDbPath()) {
   const hasOldColumn = existingColumns.some((col) => col.name === 'store_id');
   if (hasOldColumn) {
     db.exec(`
+      BEGIN;
       ALTER TABLE scans RENAME COLUMN store_id TO category;
       ALTER TABLE scans RENAME COLUMN shelf_id TO container;
+      COMMIT;
     `);
   }
 
