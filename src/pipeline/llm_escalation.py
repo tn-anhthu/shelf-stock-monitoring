@@ -68,6 +68,12 @@ MODEL_ID = "claude-haiku-4-5"
 # see .env.example for pricing/verification date and the thinking_level note
 # below (verified not to truncate on this model either).
 GEMINI_MODEL_ID = os.environ.get("GEMINI_ESCALATION_MODEL", "gemini-3.5-flash-lite")
+# OpenRouter fallback used by src/pipeline/classify.py::_escalate when the
+# primary Gemini call itself errors (503/rate-limit/timeout) -- distinct
+# env var from src/pipeline/gap_verify.py's GAP_VERIFY_FALLBACK_MODEL since
+# the two features (gap verification vs. SKU classification) are unrelated
+# and shouldn't share a config knob.
+CLASSIFY_FALLBACK_MODEL = os.environ.get("CLASSIFY_FALLBACK_MODEL", "openai/gpt-5.6-luna")
 
 _INTRO_TEXT = "Đây là ảnh sản phẩm cần nhận diện:"
 _MATCH_INSTRUCTION_TEXT = (
@@ -135,6 +141,11 @@ def _image_bytes(image: Image.Image) -> bytes:
 
 def _encode_image(image: Image.Image) -> str:
     return base64.standard_b64encode(_image_bytes(image)).decode("utf-8")
+
+
+def _image_data_url(image: Image.Image) -> str:
+    encoded = base64.standard_b64encode(_image_bytes(image)).decode("utf-8")
+    return f"data:image/jpeg;base64,{encoded}"
 
 
 def _image_block(image: Image.Image) -> Dict:
@@ -290,6 +301,73 @@ def escalate_to_llm_gemini(
         usage["output_tokens"] += response.usage_metadata.candidates_token_count
         try:
             parsed = json.loads(response.text)
+            return parsed["answer"], parsed.get("reasoning", ""), usage
+        except json.JSONDecodeError:
+            if attempt == max_retries:
+                raise
+
+
+def escalate_to_llm_openrouter(
+    client,
+    image: Image.Image,
+    candidates: List[Tuple[str, str]],
+    images_dir: str = "data/catalog/images",
+    model: str = CLASSIFY_FALLBACK_MODEL,
+    max_retries: int = 2,
+) -> Tuple[str, str, Dict[str, int]]:
+    """OpenRouter fallback for escalate_to_llm_gemini, used by
+    src/pipeline/classify.py::_escalate only when the primary Gemini call
+    itself errors (503/rate-limit/timeout) -- a genuine "unknown" answer from
+    Gemini never reaches this function. Same OpenAI-compatible client shape
+    as src/pipeline/gap_verify.py::build_client() (base_url=OPENROUTER_BASE_URL,
+    constructing the client is the caller's job, same division of
+    responsibility as escalate_to_llm/escalate_to_llm_gemini), and the exact
+    same prompt/schema as escalate_to_llm via the shared
+    _INTRO_TEXT/_MATCH_INSTRUCTION_TEXT/_REASONING_SCHEMA_DESCRIPTION
+    constants -- only the transport (OpenAI-compatible chat.completions,
+    image as a data: URL) and this function's own (answer, reasoning, usage)
+    signature differ from gap_verify's (verdict, reason)."""
+    sku_ids = [sku_id for sku_id, _ in candidates]
+
+    content: List[Dict] = [
+        {"type": "image_url", "image_url": {"url": _image_data_url(image)}},
+        {"type": "text", "text": _INTRO_TEXT},
+    ]
+    for sku_id, name in candidates:
+        content.append({"type": "text", "text": f"- {sku_id}: {name}"})
+        reference_image = _load_reference_image(sku_id, images_dir)
+        if reference_image is not None:
+            content.append({"type": "image_url", "image_url": {"url": _image_data_url(reference_image)}})
+    content.append({"type": "text", "text": _MATCH_INSTRUCTION_TEXT})
+
+    schema = {
+        "type": "object",
+        "properties": {
+            "reasoning": {"type": "string", "description": _REASONING_SCHEMA_DESCRIPTION},
+            "answer": {"type": "string", "enum": sku_ids + ["unknown"]},
+        },
+        "required": ["reasoning", "answer"],
+        "additionalProperties": False,
+    }
+
+    usage = {"input_tokens": 0, "output_tokens": 0}
+    for attempt in range(max_retries + 1):
+        response = client.chat.completions.create(
+            model=model,
+            max_tokens=512,
+            messages=[{"role": "user", "content": content}],
+            response_format={
+                "type": "json_schema",
+                "json_schema": {"name": "classify_answer", "strict": True, "schema": schema},
+            },
+            extra_body={"provider": {"require_parameters": True}},
+        )
+        if response.usage is not None:
+            usage["input_tokens"] += response.usage.prompt_tokens
+            usage["output_tokens"] += response.usage.completion_tokens
+        text = response.choices[0].message.content
+        try:
+            parsed = json.loads(text)
             return parsed["answer"], parsed.get("reasoning", ""), usage
         except json.JSONDecodeError:
             if attempt == max_retries:

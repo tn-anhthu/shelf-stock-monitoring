@@ -29,7 +29,8 @@ import numpy as np
 from PIL import Image
 
 from src.classification.benchmark.retrieve import cosine_similarity
-from src.pipeline.llm_escalation import escalate_to_llm, escalate_to_llm_gemini
+from src.pipeline.gap_verify import build_client as _build_openrouter_client
+from src.pipeline.llm_escalation import escalate_to_llm, escalate_to_llm_gemini, escalate_to_llm_openrouter
 
 
 def load_catalog_embeddings(catalog_items: List[Dict]) -> List[Tuple[str, np.ndarray]]:
@@ -56,10 +57,25 @@ def _escalate(llm_client, crop_image, candidates, images_dir):
     (anthropic | gemini, default anthropic -- see .env.example). The caller
     is responsible for constructing an llm_client matching that same
     provider (anthropic.Anthropic vs. google.genai.Client); this function
-    only decides which escalate_to_llm* function's shape to call it with."""
+    only decides which escalate_to_llm* function's shape to call it with.
+
+    gemini only: if the Gemini call itself errors (503/rate-limit/timeout --
+    a genuine "unknown" answer never raises, so it's never caught here),
+    retries once via escalate_to_llm_openrouter (CLASSIFY_FALLBACK_MODEL,
+    default openai/gpt-5.6-luna) instead of losing that box's answer to one
+    transient provider hiccup. Uses the same OpenAI-compatible client as
+    src/pipeline/gap_verify.py::build_client() -- if OPENROUTER_API_KEY isn't
+    set, build_client() returns None and the original Gemini error is
+    re-raised unchanged (same fail-open contract as gap_verify)."""
     provider = os.environ.get("LLM_PROVIDER", "anthropic")
     if provider == "gemini":
-        return escalate_to_llm_gemini(llm_client, crop_image, candidates, images_dir=images_dir)
+        try:
+            return escalate_to_llm_gemini(llm_client, crop_image, candidates, images_dir=images_dir)
+        except Exception:
+            fallback_client = _build_openrouter_client()
+            if fallback_client is None:
+                raise
+            return escalate_to_llm_openrouter(fallback_client, crop_image, candidates, images_dir=images_dir)
     return escalate_to_llm(llm_client, crop_image, candidates, images_dir=images_dir)
 
 

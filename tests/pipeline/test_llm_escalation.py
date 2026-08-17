@@ -8,6 +8,7 @@ from PIL import Image
 from src.pipeline.llm_escalation import (
     escalate_to_llm,
     escalate_to_llm_gemini,
+    escalate_to_llm_openrouter,
     verify_same_object,
     verify_same_object_gemini,
 )
@@ -105,6 +106,52 @@ class FlakyGeminiModels:
 class FlakyGeminiClient:
     def __init__(self, fail_times, answer):
         self.models = FlakyGeminiModels(fail_times, answer)
+
+
+class FakeOpenRouterCompletions:
+    def __init__(self, answer, reasoning="Bao bì khớp với candidate này"):
+        self.answer = answer
+        self.reasoning = reasoning
+        self.calls = []
+
+    def create(self, **kwargs):
+        self.calls.append(kwargs)
+        text = json.dumps({"reasoning": self.reasoning, "answer": self.answer})
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content=text))],
+            usage=SimpleNamespace(prompt_tokens=100, completion_tokens=20),
+        )
+
+
+class FakeOpenRouterClient:
+    def __init__(self, answer, reasoning="Bao bì khớp với candidate này"):
+        self.chat = SimpleNamespace(completions=FakeOpenRouterCompletions(answer, reasoning))
+
+
+class FlakyOpenRouterCompletions:
+    """Mirrors FlakyMessages/FlakyGeminiModels but for the OpenAI-compatible
+    chat.completions response shape used by OpenRouter."""
+
+    def __init__(self, fail_times, answer):
+        self.fail_times = fail_times
+        self.answer = answer
+        self.calls = 0
+
+    def create(self, **kwargs):
+        self.calls += 1
+        if self.calls <= self.fail_times:
+            text = "{answer: " + self.answer  # malformed: unquoted key, unterminated
+        else:
+            text = json.dumps({"reasoning": "ok", "answer": self.answer})
+        return SimpleNamespace(
+            choices=[SimpleNamespace(message=SimpleNamespace(content=text))],
+            usage=SimpleNamespace(prompt_tokens=100, completion_tokens=20),
+        )
+
+
+class FlakyOpenRouterClient:
+    def __init__(self, fail_times, answer):
+        self.chat = SimpleNamespace(completions=FlakyOpenRouterCompletions(fail_times, answer))
 
 
 def _make_reference_image(images_dir, sku_id):
@@ -381,6 +428,129 @@ def test_escalate_to_llm_gemini_raises_after_exhausting_retries_on_persistent_ma
         escalate_to_llm_gemini(client, image, candidates, images_dir=str(tmp_path))
 
     assert client.models.calls == 3
+
+
+# --- escalate_to_llm_openrouter: 2026-08-17, OpenRouter fallback for
+# escalate_to_llm_gemini when the primary Gemini call itself errors
+# (503/rate-limit/timeout) -- same OpenAI-compatible client shape as
+# src/pipeline/gap_verify.py::build_client(), classify's own
+# (answer, reasoning, usage) signature/schema. ---
+
+
+def test_escalate_to_llm_openrouter_returns_answer_and_reasoning_from_response(tmp_path):
+    client = FakeOpenRouterClient(answer="choco_pie_orion", reasoning="Logo và màu bao bì khớp hoàn toàn")
+    image = Image.new("RGB", (10, 10))
+    candidates = [("choco_pie_orion", "Chocopie"), ("coke_330", "Coke")]
+
+    answer, reasoning, usage = escalate_to_llm_openrouter(client, image, candidates, images_dir=str(tmp_path))
+
+    assert answer == "choco_pie_orion"
+    assert reasoning == "Logo và màu bao bì khớp hoàn toàn"
+    assert usage == {"input_tokens": 100, "output_tokens": 20}
+
+
+def test_escalate_to_llm_openrouter_returns_unknown_when_model_says_so(tmp_path):
+    client = FakeOpenRouterClient(answer="unknown", reasoning="Không có candidate nào khớp thương hiệu")
+    image = Image.new("RGB", (10, 10))
+    candidates = [("choco_pie_orion", "Chocopie")]
+
+    answer, reasoning, _usage = escalate_to_llm_openrouter(client, image, candidates, images_dir=str(tmp_path))
+
+    assert answer == "unknown"
+    assert reasoning == "Không có candidate nào khớp thương hiệu"
+
+
+def test_escalate_to_llm_openrouter_schema_enum_is_sku_ids_plus_unknown(tmp_path):
+    client = FakeOpenRouterClient(answer="choco_pie_orion")
+    image = Image.new("RGB", (10, 10))
+    candidates = [("choco_pie_orion", "Chocopie"), ("coke_330", "Coke")]
+
+    escalate_to_llm_openrouter(client, image, candidates, images_dir=str(tmp_path))
+
+    call = client.chat.completions.calls[0]
+    schema = call["response_format"]["json_schema"]["schema"]
+    assert schema["properties"]["answer"]["enum"] == ["choco_pie_orion", "coke_330", "unknown"]
+    assert schema["required"] == ["reasoning", "answer"]
+    assert schema["additionalProperties"] is False
+    assert call["response_format"]["type"] == "json_schema"
+
+
+def test_escalate_to_llm_openrouter_uses_classify_fallback_model_by_default(tmp_path):
+    from src.pipeline.llm_escalation import CLASSIFY_FALLBACK_MODEL
+
+    client = FakeOpenRouterClient(answer="choco_pie_orion")
+    image = Image.new("RGB", (10, 10))
+    candidates = [("choco_pie_orion", "Chocopie")]
+
+    escalate_to_llm_openrouter(client, image, candidates, images_dir=str(tmp_path))
+
+    assert client.chat.completions.calls[0]["model"] == CLASSIFY_FALLBACK_MODEL
+
+
+def test_escalate_to_llm_openrouter_sends_crop_image_as_data_url(tmp_path):
+    client = FakeOpenRouterClient(answer="unknown")
+    image = Image.new("RGB", (10, 10))
+    candidates = [("choco_pie_orion", "Chocopie")]
+
+    escalate_to_llm_openrouter(client, image, candidates, images_dir=str(tmp_path))
+
+    content = client.chat.completions.calls[0]["messages"][0]["content"]
+    image_blocks = [c for c in content if c["type"] == "image_url"]
+    assert len(image_blocks) == 1
+    assert image_blocks[0]["image_url"]["url"].startswith("data:image/jpeg;base64,")
+
+
+def test_escalate_to_llm_openrouter_includes_reference_image_when_it_exists(tmp_path):
+    _make_reference_image(tmp_path, "choco_pie_orion")
+    client = FakeOpenRouterClient(answer="choco_pie_orion")
+    image = Image.new("RGB", (10, 10))
+    candidates = [("choco_pie_orion", "Chocopie")]
+
+    escalate_to_llm_openrouter(client, image, candidates, images_dir=str(tmp_path))
+
+    content = client.chat.completions.calls[0]["messages"][0]["content"]
+    image_blocks = [c for c in content if c["type"] == "image_url"]
+    assert len(image_blocks) == 2  # crop image + choco_pie_orion's reference image
+
+
+def test_escalate_to_llm_openrouter_falls_back_to_text_only_when_reference_image_missing(tmp_path):
+    client = FakeOpenRouterClient(answer="unknown")
+    image = Image.new("RGB", (10, 10))
+    candidates = [("choco_pie_orion", "Chocopie"), ("coke_330", "Coke")]
+
+    answer, _reasoning, _usage = escalate_to_llm_openrouter(client, image, candidates, images_dir=str(tmp_path))
+
+    content = client.chat.completions.calls[0]["messages"][0]["content"]
+    image_blocks = [c for c in content if c["type"] == "image_url"]
+    text_blocks = [c["text"] for c in content if c["type"] == "text"]
+    assert len(image_blocks) == 1  # only the crop image -> no reference image found for either candidate
+    assert "- choco_pie_orion: Chocopie" in text_blocks
+    assert "- coke_330: Coke" in text_blocks
+    assert answer == "unknown"
+
+
+def test_escalate_to_llm_openrouter_retries_once_on_malformed_json_then_succeeds(tmp_path):
+    client = FlakyOpenRouterClient(fail_times=1, answer="choco_pie_orion")
+    image = Image.new("RGB", (10, 10))
+    candidates = [("choco_pie_orion", "Chocopie")]
+
+    answer, reasoning, usage = escalate_to_llm_openrouter(client, image, candidates, images_dir=str(tmp_path))
+
+    assert answer == "choco_pie_orion"
+    assert reasoning == "ok"
+    assert client.chat.completions.calls == 2
+    assert usage == {"input_tokens": 200, "output_tokens": 40}
+
+
+def test_escalate_to_llm_openrouter_raises_after_exhausting_retries_on_persistent_malformed_json(tmp_path):
+    client = FlakyOpenRouterClient(fail_times=99, answer="choco_pie_orion")
+    image = Image.new("RGB", (10, 10))
+    candidates = [("choco_pie_orion", "Chocopie")]
+
+    with pytest.raises(json.JSONDecodeError):
+        escalate_to_llm_openrouter(client, image, candidates, images_dir=str(tmp_path))
+
+    assert client.chat.completions.calls == 3  # 1 initial attempt + 2 retries (default max_retries=2)
 
 
 # --- verify_same_object: 2026-07-28, IoU-duplicate case (see

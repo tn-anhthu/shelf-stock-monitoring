@@ -6,6 +6,7 @@ import time
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
 from PIL import Image
 
 from src.pipeline.classify import (
@@ -288,6 +289,120 @@ def test_verify_with_llm_dispatches_to_gemini_when_llm_provider_env_is_gemini(mo
     assert usage == {"input_tokens": 10, "output_tokens": 5}
     assert len(calls) == 1
     assert calls[0][0] is fake_gemini_client
+
+
+def test_verify_with_llm_falls_back_to_openrouter_when_gemini_call_errors(monkeypatch):
+    # A real 503 UNAVAILABLE from Gemini raises out of escalate_to_llm_gemini
+    # (it has no network-error retry of its own -- only malformed-JSON retry)
+    # -- confirm _escalate catches that and retries via the OpenRouter
+    # fallback instead of losing the box's answer entirely.
+    monkeypatch.setenv("LLM_PROVIDER", "gemini")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-test")
+
+    def failing_gemini(client, image, candidates, images_dir="data/catalog/images"):
+        raise RuntimeError("503 UNAVAILABLE")
+
+    monkeypatch.setattr("src.pipeline.classify.escalate_to_llm_gemini", failing_gemini)
+
+    fallback_calls = []
+
+    def fake_fallback(client, image, candidates, images_dir="data/catalog/images"):
+        fallback_calls.append((client, image, candidates, images_dir))
+        return "coke_330", "fallback reasoning", {"input_tokens": 7, "output_tokens": 3}
+
+    monkeypatch.setattr("src.pipeline.classify.escalate_to_llm_openrouter", fake_fallback)
+
+    built_clients = []
+
+    def fake_build_client(api_key=None):
+        client = object()
+        built_clients.append(client)
+        return client
+
+    monkeypatch.setattr("src.pipeline.classify._build_openrouter_client", fake_build_client)
+
+    ranked = [("choco_pie_orion", 0.9), ("coke_330", 0.5)]
+    catalog_items = [
+        {"sku_id": "choco_pie_orion", "name": "Chocopie"},
+        {"sku_id": "coke_330", "name": "Coke"},
+    ]
+
+    sku_id, score, reasoning, usage, _ranked = verify_with_llm(CROP_IMAGE, ranked, catalog_items, object())
+
+    assert sku_id == "coke_330"
+    assert score == 0.5
+    assert reasoning == "fallback reasoning"
+    assert usage == {"input_tokens": 7, "output_tokens": 3}
+    assert len(fallback_calls) == 1
+    assert fallback_calls[0][0] is built_clients[0]
+
+
+def test_verify_with_llm_reraises_gemini_error_when_openrouter_key_missing(monkeypatch):
+    # No OPENROUTER_API_KEY configured -> _build_openrouter_client() returns
+    # None, same fail-open contract as gap_verify.build_client() -- the
+    # original Gemini error must propagate unchanged, not be swallowed.
+    monkeypatch.setenv("LLM_PROVIDER", "gemini")
+    monkeypatch.delenv("OPENROUTER_API_KEY", raising=False)
+
+    def failing_gemini(client, image, candidates, images_dir="data/catalog/images"):
+        raise RuntimeError("503 UNAVAILABLE")
+
+    monkeypatch.setattr("src.pipeline.classify.escalate_to_llm_gemini", failing_gemini)
+
+    ranked = [("choco_pie_orion", 0.9)]
+    catalog_items = [{"sku_id": "choco_pie_orion", "name": "Chocopie"}]
+
+    with pytest.raises(RuntimeError, match="503 UNAVAILABLE"):
+        verify_with_llm(CROP_IMAGE, ranked, catalog_items, object())
+
+
+def test_verify_with_llm_does_not_fall_back_when_gemini_answers_unknown(monkeypatch):
+    # A genuine "unknown" answer from Gemini is not an error -- must not
+    # trigger the OpenRouter fallback at all.
+    monkeypatch.setenv("LLM_PROVIDER", "gemini")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-test")
+
+    calls = []
+
+    def working_gemini(client, image, candidates, images_dir="data/catalog/images"):
+        calls.append(1)
+        return "unknown", "no confident match", {"input_tokens": 5, "output_tokens": 2}
+
+    monkeypatch.setattr("src.pipeline.classify.escalate_to_llm_gemini", working_gemini)
+
+    def fallback_should_not_be_called(*a, **kw):
+        raise AssertionError("fallback must not be called when gemini answers normally")
+
+    monkeypatch.setattr("src.pipeline.classify.escalate_to_llm_openrouter", fallback_should_not_be_called)
+
+    ranked = [("choco_pie_orion", 0.9)]
+    catalog_items = [{"sku_id": "choco_pie_orion", "name": "Chocopie"}]
+
+    sku_id, _score, reasoning, _usage, _ranked = verify_with_llm(CROP_IMAGE, ranked, catalog_items, object())
+
+    assert sku_id is None
+    assert reasoning == "no confident match"
+    assert len(calls) == 1
+
+
+def test_verify_with_llm_does_not_fall_back_when_provider_is_anthropic(monkeypatch):
+    # The fallback is scoped to the Gemini path only (spec: escalate_to_llm's
+    # own Claude call keeps its existing behavior, no OpenRouter fallback).
+    monkeypatch.setenv("LLM_PROVIDER", "anthropic")
+    monkeypatch.setenv("OPENROUTER_API_KEY", "sk-or-v1-test")
+
+    def fallback_should_not_be_called(*a, **kw):
+        raise AssertionError("fallback must not be called for the anthropic provider")
+
+    monkeypatch.setattr("src.pipeline.classify.escalate_to_llm_openrouter", fallback_should_not_be_called)
+
+    llm_client = FakeLLMClient(answer="choco_pie_orion")
+    ranked = [("choco_pie_orion", 0.9)]
+    catalog_items = [{"sku_id": "choco_pie_orion", "name": "Chocopie"}]
+
+    sku_id, *_rest = verify_with_llm(CROP_IMAGE, ranked, catalog_items, llm_client)
+
+    assert sku_id == "choco_pie_orion"
 
 
 def test_verify_with_llm_defaults_to_claude_when_llm_provider_env_unset(monkeypatch):

@@ -55,6 +55,7 @@ pillow_heif.register_heif_opener()
 from src.catalog.db import get_connection, list_catalog
 from src.classification.benchmark.embed_siglip2 import embed_image_siglip2, load_model_siglip2
 from src.detection.train.run_trained_1a import detect_1a, load_model_1a
+from src.pipeline import gap_verify
 from src.pipeline.box_filter import filter_anomalous_boxes, filter_contained_boxes
 from src.pipeline.box_merge import merge_adjacent_fragments
 from src.pipeline.classify import classify_crops_parallel, load_catalog_embeddings, rank_candidates
@@ -157,6 +158,10 @@ def main():
             raise SystemExit("ANTHROPIC_API_KEY not set — export it before running this script.")
         llm_client = anthropic.Anthropic()
 
+    gap_verify_client = gap_verify.build_client()
+    if gap_verify_client is None:
+        print("gap_verify: OPENROUTER_API_KEY not set — skipping gap verification (fail-open, raw geometry gaps kept)")
+
     out_dir = Path(args.out)
     out_dir.mkdir(parents=True, exist_ok=True)
 
@@ -190,8 +195,13 @@ def main():
         f"({len(flagged_regions)} flagged for review)"
     )
 
-    gaps = detect_gaps(boxes, row_cluster_tolerance=row_cluster_tolerance)
-    print(f"Gap detection flagged {len(gaps)} suspicious gap(s)")
+    raw_gaps = detect_gaps(boxes, row_cluster_tolerance=row_cluster_tolerance)
+    if gap_verify_client is not None:
+        gaps = [g["box"] for g in gap_verify.verify_gaps(gap_verify_client, shelf_image, raw_gaps)]
+        print(f"Gap detection: {len(raw_gaps)} raw candidate(s) -> {len(gaps)} after VLM verification")
+    else:
+        gaps = raw_gaps
+        print(f"Gap detection flagged {len(gaps)} suspicious gap(s) (gap_verify unavailable, unfiltered)")
     for gx1, gy1, gx2, gy2 in gaps:
         print(f"  gap: box_coords={tuple(round(v) for v in (gx1, gy1, gx2, gy2))}")
 

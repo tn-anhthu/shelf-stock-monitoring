@@ -31,6 +31,7 @@ pillow_heif.register_heif_opener()
 from src.catalog.db import get_connection, list_catalog
 from src.classification.benchmark.embed_siglip2 import embed_image_siglip2, load_model_siglip2
 from src.detection.train.run_trained_1a import detect_1a, load_model_1a
+from src.pipeline import gap_verify
 from src.pipeline.classify import load_catalog_embeddings
 from src.pipeline.scan import run_scan
 
@@ -50,6 +51,10 @@ def main():
         raise SystemExit("ANTHROPIC_API_KEY not set — export it before running this script.")
     llm_client = anthropic.Anthropic()
 
+    gap_verify_client = gap_verify.build_client()
+    if gap_verify_client is None:
+        print("gap_verify: OPENROUTER_API_KEY not set — skipping gap verification (fail-open, raw geometry gaps kept)")
+
     conn = get_connection(args.db)
     catalog_items = list_catalog(conn)
     catalog_embeddings = load_catalog_embeddings(catalog_items)
@@ -68,6 +73,7 @@ def main():
         detect_fn=lambda img: detect_1a(yolo_model, img),
         embed_fn=real_embed_fn,
         llm_client=llm_client,
+        gap_verify_client=gap_verify_client,
         max_workers=args.max_workers,
     )
     print(json.dumps(result, indent=2, ensure_ascii=False))
