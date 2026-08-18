@@ -374,8 +374,8 @@ Across all 4 originally-cited cases, re-verified under the current system
 
 1. **Hảo Hảo (test1)**: Investigation 2: not a `cluster_rows` bug at all.
    `box45_both_cups` is an isolated singleton row under both OLD and NEW
-   (real y-center gaps on both sides already exceed tolerance -- 38.4px and
-   179.7px vs. 18.95px -- with no intermediate boxes to chain through). The
+   (real y-center gaps on both sides already exceed tolerance, 38.4px and
+   179.7px vs. 18.95px, with no intermediate boxes to chain through). The
    case is fully resolved by
    `filter_contained_boxes`, identically regardless of `cluster_rows`
    version. **Ruled out.**
@@ -406,7 +406,7 @@ Across all 4 originally-cited cases, re-verified under the current system
      **NEW** algorithm over-fragments it into 3 pieces, same
      worse-not-better pattern as row 5.
 
-Additionally, this investigation found a **fifth, fresh instance** of the
+This investigation also found a **fifth, fresh instance** of the
 same over-fragmentation pattern while checking Investigation 2: NEW splits
 OLD's row 19 (test1, 4 side-by-side instant-noodle boxes including box41,
 visually one real shelf row) into 2 NEW rows, producing a phantom gap
