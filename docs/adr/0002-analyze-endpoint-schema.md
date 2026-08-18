@@ -1,7 +1,7 @@
 # ADR-002: `POST /analyze` request/response schema
 
 **Status:** Accepted (2026-07-28)
-**Cập nhật 2026-08-13:** field `store_id`/`shelf_id` trong toàn bộ schema dưới đây đã đổi tên thành `category`/`container` (xem `docs/superpowers/specs/2026-08-13-category-container-naming-design.md`) -- nội dung dưới đây đã cập nhật theo tên mới, không giữ tên cũ.
+**Cập nhật 2026-08-13:** field `store_id`/`shelf_id` trong toàn bộ schema dưới đây đã đổi tên thành `category`/`container` (xem `docs/superpowers/specs/2026-08-13-category-container-naming-design.md`), nội dung dưới đây đã cập nhật theo tên mới, không giữ tên cũ.
 **Liên quan:** [ADR-001](0001-migrate-node-api-frontend.md) (kiến trúc 3 tầng ml-service/api/web)
 
 ## Context
