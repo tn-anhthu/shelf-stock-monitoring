@@ -110,6 +110,9 @@ export default function InventoryPage({ onScanShelf }) {
                 category={category}
                 container={container}
                 confirmedAt={dashboard.confirmed_at}
+                imageUrl={dashboard.image_url}
+                imageWidth={dashboard.image_width}
+                imageHeight={dashboard.image_height}
                 onConfirmed={loadDashboard}
               />
             </>

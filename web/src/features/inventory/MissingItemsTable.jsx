@@ -3,14 +3,28 @@ import Button from '../../shared/ui/Button.jsx';
 import { confirmScan } from '../scan-wizard/api.js';
 import { computeTotalValue, isDuplicateSku } from '../scan-wizard/quantities.js';
 import { buildConfirmationRow, isGapResolved } from './missingItems.js';
+import GapImageModal from './GapImageModal.jsx';
 
 const UNRESOLVED_VALUE = '__unresolved__';
 
-export default function MissingItemsTable({ missingItems, quantities, catalog, scanId, category, container, confirmedAt, onConfirmed }) {
+export default function MissingItemsTable({
+  missingItems,
+  quantities,
+  catalog,
+  scanId,
+  category,
+  container,
+  confirmedAt,
+  imageUrl,
+  imageWidth,
+  imageHeight,
+  onConfirmed,
+}) {
   const [selections, setSelections] = useState({});
   const [dismissed, setDismissed] = useState(() => new Set());
   const [savingId, setSavingId] = useState(null);
   const [saveError, setSaveError] = useState(null);
+  const [viewingItem, setViewingItem] = useState(null);
 
   if (!missingItems || missingItems.length === 0) return null;
 
@@ -63,6 +77,7 @@ export default function MissingItemsTable({ missingItems, quantities, catalog, s
       <table className="mt-3 w-full border-collapse text-sm">
         <thead>
           <tr className="border-b border-ink text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">
+            <th className="py-2 pr-2">Xem</th>
             <th className="py-2 pr-2">Sản phẩm lân cận</th>
             <th className="pr-2">Gợi ý SKU</th>
             <th className="pr-2">Chọn xác nhận</th>
@@ -75,6 +90,19 @@ export default function MissingItemsTable({ missingItems, quantities, catalog, s
             const status = resolved ? 'confirmed' : dismissed.has(item.gap_box_id) ? 'unresolved' : 'needs_review';
             return (
               <tr key={item.gap_box_id} className="border-b border-card-border align-top">
+                <td className="py-2.5 pr-2">
+                  {imageUrl ? (
+                    <button
+                      type="button"
+                      onClick={() => setViewingItem(item)}
+                      className="text-xs text-text-secondary underline decoration-1 underline-offset-2 hover:text-ink"
+                    >
+                      Xem
+                    </button>
+                  ) : (
+                    <span className="text-text-muted">—</span>
+                  )}
+                </td>
                 <td className="py-2.5 pr-2 text-text-secondary">
                   {item.nearby_skus.length > 0 ? item.nearby_skus.map((s) => s.sku_name).join(', ') : '—'}
                 </td>
@@ -126,6 +154,15 @@ export default function MissingItemsTable({ missingItems, quantities, catalog, s
         </tbody>
       </table>
       {saveError && <p className="mt-2 text-status-out">Lưu thất bại: {saveError}</p>}
+      {viewingItem && (
+        <GapImageModal
+          item={viewingItem}
+          imageUrl={imageUrl}
+          imageWidth={imageWidth}
+          imageHeight={imageHeight}
+          onClose={() => setViewingItem(null)}
+        />
+      )}
     </div>
   );
 }
