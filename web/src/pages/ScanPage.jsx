@@ -4,7 +4,7 @@ import CropStep from '../features/scan-wizard/CropStep.jsx';
 import EditStep from '../features/scan-wizard/EditStep.jsx';
 import ConfirmStep from '../features/scan-wizard/ConfirmStep.jsx';
 import StepIndicator from '../features/scan-wizard/StepIndicator.jsx';
-import { analyzeImage, confirmScan, fetchCatalog } from '../features/scan-wizard/api.js';
+import { analyzeImage, confirmScan, uploadScanImage, fetchCatalog } from '../features/scan-wizard/api.js';
 import { computeTotalValue } from '../features/scan-wizard/quantities.js';
 import { useObjectUrl } from '../shared/useObjectUrl.js';
 
@@ -115,6 +115,15 @@ export default function ScanPage({ prefill }) {
         total_value: computeTotalValue(quantities),
         boxes: analyzeResult.boxes,
       });
+      if (croppedImageBlob && analyzeResult.image) {
+        // Fail-open: lỗi upload ảnh không được chặn xác nhận scan đã thành công.
+        uploadScanImage({
+          scanId: analyzeResult.scan_id,
+          imageBlob: croppedImageBlob,
+          width: analyzeResult.image.width,
+          height: analyzeResult.image.height,
+        }).catch(() => {});
+      }
       setConfirmed(true);
     } catch (err) {
       setConfirmError(err.message);

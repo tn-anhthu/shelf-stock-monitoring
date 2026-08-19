@@ -48,3 +48,16 @@ export async function confirmScan(payload) {
   }
   return res.json();
 }
+
+export async function uploadScanImage({ scanId, imageBlob, width, height }) {
+  const formData = new FormData();
+  formData.append('image', imageBlob, 'shelf.jpg');
+  formData.append('width', String(width));
+  formData.append('height', String(height));
+
+  const res = await fetch(`/confirm/${scanId}/image`, { method: 'POST', body: formData });
+  if (!res.ok) {
+    throw new Error(`upload image request failed: ${res.status}`);
+  }
+  return res.json();
+}
