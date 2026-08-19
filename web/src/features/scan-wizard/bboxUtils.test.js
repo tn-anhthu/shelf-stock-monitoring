@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { bboxToPercent, getBoxStyle, getBoxLabel } from './bboxUtils.js';
+import { bboxToPercent, getBoxStyle, getBoxLabel, getPopupAnchor } from './bboxUtils.js';
 
 describe('bboxToPercent', () => {
   test('converts a pixel bbox to percentages of the image size', () => {
@@ -136,5 +136,49 @@ describe('getBoxLabel', () => {
     expect(
       getBoxLabel({ type: 'product', sku_id: 'karo_org', is_unknown: false, excluded_from_count: true, needs_review: true }, quantities),
     ).toEqual({ title: 'Nghi trùng với sản phẩm khác — cần kiểm tra', sku_id: 'karo_org', stt: null });
+  });
+});
+
+describe('getPopupAnchor', () => {
+  test('defaults to left/above for a box in the middle of the image', () => {
+    expect(getPopupAnchor({ left: 40, top: 40, width: 10, height: 10 })).toEqual({
+      horizontal: 'left',
+      vertical: 'above',
+    });
+  });
+
+  test('anchors right when the box is near the right edge (left + width > 70)', () => {
+    expect(getPopupAnchor({ left: 65, top: 40, width: 10, height: 10 })).toEqual({
+      horizontal: 'right',
+      vertical: 'above',
+    });
+  });
+
+  test('flips below when the box is near the top edge (top < 12)', () => {
+    expect(getPopupAnchor({ left: 40, top: 5, width: 10, height: 10 })).toEqual({
+      horizontal: 'left',
+      vertical: 'below',
+    });
+  });
+
+  test('anchors right AND flips below when the box is near the top-right corner', () => {
+    expect(getPopupAnchor({ left: 65, top: 5, width: 10, height: 10 })).toEqual({
+      horizontal: 'right',
+      vertical: 'below',
+    });
+  });
+
+  test('left + width exactly at the 70 threshold stays left (not strictly greater)', () => {
+    expect(getPopupAnchor({ left: 60, top: 40, width: 10, height: 10 })).toEqual({
+      horizontal: 'left',
+      vertical: 'above',
+    });
+  });
+
+  test('top exactly at the 12 threshold stays above (not strictly less)', () => {
+    expect(getPopupAnchor({ left: 40, top: 12, width: 10, height: 10 })).toEqual({
+      horizontal: 'left',
+      vertical: 'above',
+    });
   });
 });

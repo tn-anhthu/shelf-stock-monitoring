@@ -31,6 +31,13 @@ export function getBoxStyle(box, quantities) {
   return { variant: 'product', flagStatus: match?.flag_status ?? null };
 }
 
+export function getPopupAnchor(pos) {
+  return {
+    horizontal: pos.left + pos.width > 70 ? 'right' : 'left',
+    vertical: pos.top < 12 ? 'below' : 'above',
+  };
+}
+
 export function getBoxLabel(box, quantities) {
   if (box.type === 'product' && box.sku_id && !box.is_unknown) {
     if (box.excluded_from_count && box.needs_review) {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { bboxToPercent, getBoxStyle, getBoxLabel } from './bboxUtils.js';
+import { bboxToPercent, getBoxStyle, getBoxLabel, getPopupAnchor } from './bboxUtils.js';
 
 const PRODUCT_COLOR = '#3B82F6';
 
@@ -16,6 +16,18 @@ export function hexToRgba(hex, alpha) {
   const g = parseInt(normalized.slice(2, 4), 16);
   const b = parseInt(normalized.slice(4, 6), 16);
   return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+// Anchors the popup to whichever side of the box keeps it inside the image
+// — a box near the right or top edge would otherwise push the popup (which
+// grows from a fixed corner) off-canvas.
+function popupStyle(pos) {
+  const anchor = getPopupAnchor(pos);
+  const horizontal =
+    anchor.horizontal === 'right' ? { right: `${100 - (pos.left + pos.width)}%` } : { left: `${pos.left}%` };
+  const vertical =
+    anchor.vertical === 'below' ? { top: `calc(${pos.top + pos.height}% + 0.25rem)` } : { top: `calc(${pos.top}% - 1.75rem)` };
+  return { ...horizontal, ...vertical };
 }
 
 export default function BboxOverlay({ imageUrl, imageWidth, imageHeight, boxes, quantities, hoveredSkuId, onHoverSku }) {
@@ -78,7 +90,7 @@ export default function BboxOverlay({ imageUrl, imageWidth, imageHeight, boxes, 
               {label && (
                 <div
                   className="absolute z-10 rounded border border-ink bg-page px-2 py-1 text-xs text-ink shadow-md"
-                  style={{ left: `${pos.left}%`, top: `calc(${pos.top}% - 1.75rem)` }}
+                  style={popupStyle(pos)}
                 >
                   {label.stt !== null && <span className="mr-1 font-bold">#{label.stt}</span>}
                   {label.title}
