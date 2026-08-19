@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { fetchShelves, fetchDashboard } from '../features/scan-wizard/api.js';
+import { fetchShelves, fetchDashboard, fetchCatalog } from '../features/scan-wizard/api.js';
 import CategoryContainerPicker from '../features/inventory/CategoryContainerPicker.jsx';
 import StatusBar from '../features/inventory/StatusBar.jsx';
 import SkuTable from '../features/inventory/SkuTable.jsx';
 import Totals from '../features/inventory/Totals.jsx';
 import EmptyState from '../features/inventory/EmptyState.jsx';
 import ErrorBanner from '../features/inventory/ErrorBanner.jsx';
+import MissingItemsTable from '../features/inventory/MissingItemsTable.jsx';
 import { buildAttentionFirstRows } from '../features/inventory/sortRows.js';
 
 export default function InventoryPage({ onScanShelf }) {
@@ -15,6 +16,11 @@ export default function InventoryPage({ onScanShelf }) {
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [catalog, setCatalog] = useState([]);
+
+  useEffect(() => {
+    fetchCatalog().then(setCatalog).catch(() => setCatalog([]));
+  }, []);
 
   useEffect(() => {
     fetchShelves()
@@ -96,6 +102,15 @@ export default function InventoryPage({ onScanShelf }) {
               <StatusBar {...dashboard.status_breakdown} />
               <SkuTable rows={rows} />
               <Totals kpis={dashboard.kpis} />
+              <MissingItemsTable
+                missingItems={dashboard.missing_items}
+                quantities={dashboard.full_table}
+                catalog={catalog}
+                scanId={dashboard.scan_id}
+                category={category}
+                container={container}
+                onConfirmed={loadDashboard}
+              />
             </>
           )}
         </div>
