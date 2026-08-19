@@ -113,6 +113,7 @@ export default function ScanPage({ prefill }) {
         container,
         quantities,
         total_value: computeTotalValue(quantities),
+        boxes: analyzeResult.boxes,
       });
       setConfirmed(true);
     } catch (err) {
