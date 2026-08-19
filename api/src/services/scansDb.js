@@ -36,34 +36,47 @@ function createScansDb(dbPath = defaultDbPath()) {
     )
   `);
 
-  function insertScan({ scanId, category, container, quantities, totalValue }) {
+  const columnsAfterCreate = db.prepare('PRAGMA table_info(scans)').all().map((col) => col.name);
+  if (!columnsAfterCreate.includes('boxes')) {
+    db.exec(`ALTER TABLE scans ADD COLUMN boxes TEXT NOT NULL DEFAULT '[]'`);
+  }
+  if (!columnsAfterCreate.includes('last_updated_at')) {
+    db.exec(`ALTER TABLE scans ADD COLUMN last_updated_at TEXT`);
+    db.exec(`UPDATE scans SET last_updated_at = confirmed_at WHERE last_updated_at IS NULL`);
+  }
+
+  function insertScan({ scanId, category, container, quantities, totalValue, boxes }) {
+    const existing = db.prepare('SELECT confirmed_at, boxes FROM scans WHERE scan_id = ?').get(scanId);
+    const now = new Date().toISOString();
+    const boxesToStore = boxes !== undefined ? boxes : existing ? JSON.parse(existing.boxes) : [];
+
     db.prepare(
-      `INSERT OR REPLACE INTO scans (scan_id, category, container, quantities, total_value, confirmed_at)
-       VALUES (@scanId, @category, @container, @quantities, @totalValue, @confirmedAt)`,
+      `INSERT OR REPLACE INTO scans (scan_id, category, container, quantities, total_value, boxes, confirmed_at, last_updated_at)
+       VALUES (@scanId, @category, @container, @quantities, @totalValue, @boxes, @confirmedAt, @lastUpdatedAt)`,
     ).run({
       scanId,
       category,
       container,
       quantities: JSON.stringify(quantities),
       totalValue,
-      confirmedAt: new Date().toISOString(),
+      boxes: JSON.stringify(boxesToStore),
+      confirmedAt: existing ? existing.confirmed_at : now,
+      lastUpdatedAt: now,
     });
   }
 
   function getScanById(scanId) {
     const row = db.prepare('SELECT * FROM scans WHERE scan_id = ?').get(scanId);
     if (!row) return null;
-    return { ...row, quantities: JSON.parse(row.quantities) };
+    return { ...row, quantities: JSON.parse(row.quantities), boxes: JSON.parse(row.boxes) };
   }
 
   function getLatestScan(category, container) {
     const row = db
-      .prepare(
-        'SELECT * FROM scans WHERE category = ? AND container = ? ORDER BY confirmed_at DESC LIMIT 1',
-      )
+      .prepare('SELECT * FROM scans WHERE category = ? AND container = ? ORDER BY confirmed_at DESC LIMIT 1')
       .get(category, container);
     if (!row) return null;
-    return { ...row, quantities: JSON.parse(row.quantities) };
+    return { ...row, quantities: JSON.parse(row.quantities), boxes: JSON.parse(row.boxes) };
   }
 
   return { db, insertScan, getScanById, getLatestScan };
