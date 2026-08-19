@@ -30,3 +30,21 @@ export function getBoxStyle(box, quantities) {
   const match = quantities.find((q) => q.sku_id === box.sku_id);
   return { variant: 'product', flagStatus: match?.flag_status ?? null };
 }
+
+export function getBoxLabel(box, quantities) {
+  if (box.type === 'product' && box.sku_id && !box.is_unknown) {
+    if (box.excluded_from_count && box.needs_review) {
+      return { title: 'Nghi trùng với sản phẩm khác — cần kiểm tra', sku_id: box.sku_id, stt: null };
+    }
+    const rowIndex = quantities.findIndex((q) => q.sku_id === box.sku_id);
+    return {
+      title: rowIndex === -1 ? box.sku_id : quantities[rowIndex].sku_name,
+      sku_id: box.sku_id,
+      stt: rowIndex === -1 ? null : rowIndex + 1,
+    };
+  }
+  if (box.type === 'gap') {
+    return { title: box.needs_review ? 'Vùng nghi ngờ trống — cần kiểm tra' : 'Kệ trống (gap)', sku_id: null, stt: null };
+  }
+  return { title: 'Không xác định được sản phẩm', sku_id: null, stt: null };
+}

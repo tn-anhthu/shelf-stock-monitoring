@@ -1,4 +1,5 @@
-import { bboxToPercent, getBoxStyle } from './bboxUtils.js';
+import { useState } from 'react';
+import { bboxToPercent, getBoxStyle, getBoxLabel } from './bboxUtils.js';
 
 const PRODUCT_COLOR = '#3B82F6';
 
@@ -18,6 +19,8 @@ export function hexToRgba(hex, alpha) {
 }
 
 export default function BboxOverlay({ imageUrl, imageWidth, imageHeight, boxes, quantities, hoveredSkuId, onHoverSku }) {
+  const [selectedBoxId, setSelectedBoxId] = useState(null);
+
   if (!imageUrl || !imageWidth || !imageHeight) {
     return (
       <div className="flex aspect-video items-center justify-center rounded-xl border border-dashed border-card-border text-sm text-text-muted">
@@ -52,22 +55,36 @@ export default function BboxOverlay({ imageUrl, imageWidth, imageHeight, boxes, 
             background = NEUTRAL_VARIANT_STYLE[style.variant].background;
           }
 
+          const isSelected = selectedBoxId === box.box_id;
+          const label = isSelected ? getBoxLabel(box, quantities) : null;
+
           return (
-            <div
-              key={box.box_id}
-              onMouseEnter={() => style.variant === 'product' && box.sku_id && onHoverSku(box.sku_id)}
-              onMouseLeave={() => onHoverSku(null)}
-              className="absolute rounded"
-              style={{
-                left: `${pos.left}%`,
-                top: `${pos.top}%`,
-                width: `${pos.width}%`,
-                height: `${pos.height}%`,
-                border,
-                backgroundColor: background,
-                boxShadow: isHovered ? '0 0 0 2px #fff' : 'none',
-              }}
-            />
+            <div key={box.box_id}>
+              <div
+                onMouseEnter={() => style.variant === 'product' && box.sku_id && onHoverSku(box.sku_id)}
+                onMouseLeave={() => onHoverSku(null)}
+                onClick={() => setSelectedBoxId(isSelected ? null : box.box_id)}
+                className="absolute cursor-pointer rounded"
+                style={{
+                  left: `${pos.left}%`,
+                  top: `${pos.top}%`,
+                  width: `${pos.width}%`,
+                  height: `${pos.height}%`,
+                  border,
+                  backgroundColor: background,
+                  boxShadow: isHovered ? '0 0 0 2px #fff' : 'none',
+                }}
+              />
+              {label && (
+                <div
+                  className="absolute z-10 rounded border border-ink bg-page px-2 py-1 text-xs text-ink shadow-md"
+                  style={{ left: `${pos.left}%`, top: `calc(${pos.top}% - 1.75rem)` }}
+                >
+                  {label.stt !== null && <span className="mr-1 font-bold">#{label.stt}</span>}
+                  {label.title}
+                </div>
+              )}
+            </div>
           );
         })}
       </div>

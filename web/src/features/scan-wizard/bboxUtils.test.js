@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { bboxToPercent, getBoxStyle } from './bboxUtils.js';
+import { bboxToPercent, getBoxStyle, getBoxLabel } from './bboxUtils.js';
 
 describe('bboxToPercent', () => {
   test('converts a pixel bbox to percentages of the image size', () => {
@@ -91,5 +91,50 @@ describe('getBoxStyle', () => {
         quantities
       )
     ).toEqual({ variant: 'hidden' });
+  });
+});
+
+describe('getBoxLabel', () => {
+  const quantities = [
+    { sku_id: 'choco_pie_org', sku_name: 'Bánh chocopie Orion hộp 217.8g (6 cái)', flag_status: 'low' },
+    { sku_id: 'karo_org', sku_name: 'Bánh trứng tươi chà bông Karo Richy túi 156g', flag_status: 'ok' },
+  ];
+
+  test('resolves a matched product box to its table row name and STT (1-indexed row position)', () => {
+    expect(getBoxLabel({ type: 'product', sku_id: 'karo_org', is_unknown: false }, quantities)).toEqual({
+      title: 'Bánh trứng tươi chà bông Karo Richy túi 156g',
+      sku_id: 'karo_org',
+      stt: 2,
+    });
+  });
+
+  test('a confirmed gap has no STT and a plain label', () => {
+    expect(getBoxLabel({ type: 'gap', sku_id: null, needs_review: false }, quantities)).toEqual({
+      title: 'Kệ trống (gap)',
+      sku_id: null,
+      stt: null,
+    });
+  });
+
+  test('an uncertain gap says so in the label', () => {
+    expect(getBoxLabel({ type: 'gap', sku_id: null, needs_review: true }, quantities)).toEqual({
+      title: 'Vùng nghi ngờ trống — cần kiểm tra',
+      sku_id: null,
+      stt: null,
+    });
+  });
+
+  test('an unknown box has no STT (not in the quantities table)', () => {
+    expect(getBoxLabel({ type: 'product', sku_id: null, is_unknown: true }, quantities)).toEqual({
+      title: 'Không xác định được sản phẩm',
+      sku_id: null,
+      stt: null,
+    });
+  });
+
+  test('an excluded+needs_review (dedup) box says so, keeps its sku_id, has no STT', () => {
+    expect(
+      getBoxLabel({ type: 'product', sku_id: 'karo_org', is_unknown: false, excluded_from_count: true, needs_review: true }, quantities),
+    ).toEqual({ title: 'Nghi trùng với sản phẩm khác — cần kiểm tra', sku_id: 'karo_org', stt: null });
   });
 });

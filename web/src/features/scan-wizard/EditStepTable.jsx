@@ -27,6 +27,7 @@ export default function EditStepTable({
       <table className="w-full min-w-[600px] border-collapse text-sm">
         <thead>
           <tr className="border-b border-ink text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">
+            <th className="whitespace-nowrap py-2 pr-2 font-semibold">#</th>
             <th className="whitespace-nowrap py-2 pr-2 font-semibold">Sản phẩm</th>
             <th className="whitespace-nowrap pr-2 font-semibold">SKU</th>
             <th className="whitespace-nowrap pr-2 font-semibold">Số lượng</th>
@@ -47,6 +48,7 @@ export default function EditStepTable({
                 onMouseLeave={() => onRowHover(null)}
                 className={`border-b border-card-border ${hoveredSkuId === q.sku_id ? 'bg-page' : ''}`}
               >
+                <td className="py-2.5 pr-2 text-text-secondary">{index + 1}</td>
                 <td className="py-2.5 pr-2">
                   <select
                     value={q.sku_id}
