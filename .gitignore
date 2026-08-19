@@ -54,3 +54,4 @@ docs/superpowers/
 node_modules/
 web/dist/
 api/scans.db
+api/uploads/
