@@ -25,6 +25,7 @@ router.post('/confirm', (req, res) => {
   }
 
   const quantitiesWithSource = quantities.map((q) => ({ ...q, source: q.source ?? 'scan' }));
+  const safeBoxes = Array.isArray(boxes) ? boxes : undefined;
 
   scansDb.insertScan({
     scanId,
@@ -32,7 +33,7 @@ router.post('/confirm', (req, res) => {
     container,
     quantities: quantitiesWithSource,
     totalValue: totalValue ?? 0,
-    boxes,
+    boxes: safeBoxes,
   });
 
   return res.status(200).json({ confirmed: true, scan_id: scanId });

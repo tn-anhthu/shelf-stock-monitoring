@@ -109,6 +109,7 @@ export default function InventoryPage({ onScanShelf }) {
                 scanId={dashboard.scan_id}
                 category={category}
                 container={container}
+                confirmedAt={dashboard.confirmed_at}
                 onConfirmed={loadDashboard}
               />
             </>

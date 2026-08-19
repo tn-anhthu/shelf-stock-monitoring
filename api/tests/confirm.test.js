@@ -117,6 +117,30 @@ describe('POST /confirm', () => {
     expect(scansDb.getScanById('scan-boxes-1').boxes).toEqual(boxes);
   });
 
+  test('discards a non-array boxes value instead of persisting it, storing [] for a new scan', async () => {
+    const res1 = await request(app).post('/confirm').send({
+      scan_id: 'scan-boxes-2',
+      category: 'mi-goi',
+      container: 'ke-a',
+      quantities: QUANTITIES,
+      total_value: 60000,
+      boxes: 'oops',
+    });
+    expect(res1.status).toBe(200);
+    expect(scansDb.getScanById('scan-boxes-2').boxes).toEqual([]);
+
+    const res2 = await request(app).post('/confirm').send({
+      scan_id: 'scan-boxes-3',
+      category: 'mi-goi',
+      container: 'ke-a',
+      quantities: QUANTITIES,
+      total_value: 60000,
+      boxes: { not: 'an array' },
+    });
+    expect(res2.status).toBe(200);
+    expect(scansDb.getScanById('scan-boxes-3').boxes).toEqual([]);
+  });
+
   test('defaults source to "scan" on quantities rows that do not already specify it', async () => {
     const res = await request(app).post('/confirm').send({
       scan_id: 'scan-source-1',

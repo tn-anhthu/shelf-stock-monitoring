@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import Button from '../../shared/ui/Button.jsx';
 import { confirmScan } from '../scan-wizard/api.js';
-import { computeTotalValue } from '../scan-wizard/quantities.js';
+import { computeTotalValue, isDuplicateSku } from '../scan-wizard/quantities.js';
 import { buildConfirmationRow, isGapResolved } from './missingItems.js';
 
 const UNRESOLVED_VALUE = '__unresolved__';
 
-export default function MissingItemsTable({ missingItems, quantities, catalog, scanId, category, container, onConfirmed }) {
+export default function MissingItemsTable({ missingItems, quantities, catalog, scanId, category, container, confirmedAt, onConfirmed }) {
   const [selections, setSelections] = useState({});
   const [dismissed, setDismissed] = useState(() => new Set());
   const [savingId, setSavingId] = useState(null);
@@ -25,6 +25,11 @@ export default function MissingItemsTable({ missingItems, quantities, catalog, s
 
     const catalogEntry = catalog.find((c) => c.sku_id === choice);
     if (!catalogEntry) return;
+
+    if (isDuplicateSku(quantities, choice)) {
+      setSaveError('SKU này đã có trong danh sách — vui lòng chọn SKU khác hoặc bỏ qua.');
+      return;
+    }
 
     const nextQuantities = [...quantities, buildConfirmationRow(item.gap_box_id, choice, catalogEntry)];
     setSavingId(item.gap_box_id);
@@ -50,6 +55,11 @@ export default function MissingItemsTable({ missingItems, quantities, catalog, s
       <h2 className="font-heading text-sm font-bold uppercase tracking-wide text-text-secondary">
         Sản phẩm nghi thiếu (gap chưa xác định SKU)
       </h2>
+      {confirmedAt && (
+        <p className="mt-1 text-xs text-text-secondary">
+          Dựa trên lần quét gần nhất — {new Date(confirmedAt).toLocaleString('vi-VN')}
+        </p>
+      )}
       <table className="mt-3 w-full border-collapse text-sm">
         <thead>
           <tr className="border-b border-ink text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">
@@ -82,11 +92,11 @@ export default function MissingItemsTable({ missingItems, quantities, catalog, s
                         className="border-0 border-b border-ink bg-transparent px-0 py-1 focus:outline-none"
                       >
                         <option value="">— Chọn —</option>
-                        {item.candidates.map((c) => (
+                        {item.candidates.filter((c) => !isDuplicateSku(quantities, c.sku_id)).map((c) => (
                           <option key={c.sku_id} value={c.sku_id}>{c.sku_name}</option>
                         ))}
                         <optgroup label="Khác (toàn bộ danh mục)">
-                          {catalog.map((c) => (
+                          {catalog.filter((c) => !isDuplicateSku(quantities, c.sku_id)).map((c) => (
                             <option key={c.sku_id} value={c.sku_id}>{c.name}</option>
                           ))}
                         </optgroup>

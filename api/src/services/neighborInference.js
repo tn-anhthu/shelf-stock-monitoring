@@ -42,6 +42,13 @@ function toDisplay(skuId, catalog) {
 
 function findMissingItemSuggestions(scanRow, catalog) {
   const boxes = scanRow.boxes ?? [];
+  // NOTE: !b.needs_review is only equivalent to "gap_verify confirmed this as a
+  // real gap" when gap verification actually ran. If ml-service's gap-verify
+  // client isn't configured (no OPENROUTER_API_KEY), scan.py's fail-open path
+  // normalizes every raw geometry candidate to needs_review: false, so this
+  // filter would then treat every unverified candidate as confirmed. Fixing
+  // that requires piping the real verdict through ml-service/mapping.py --
+  // out of scope here; flagged for a follow-up.
   const confirmedGaps = boxes.filter((b) => b.type === 'gap' && !b.needs_review);
   if (confirmedGaps.length === 0) return [];
 
