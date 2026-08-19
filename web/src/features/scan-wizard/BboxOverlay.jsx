@@ -10,6 +10,8 @@ const NEUTRAL_VARIANT_STYLE = {
 
 const BOX_FILL_OPACITY = 0.15;
 
+const DEFAULT_CAPTION = 'Ảnh kệ hàng · di chuột vào dòng bảng để xem vị trí';
+
 export function hexToRgba(hex, alpha) {
   const normalized = hex.replace('#', '');
   const r = parseInt(normalized.slice(0, 2), 16);
@@ -30,7 +32,16 @@ function popupStyle(pos) {
   return { ...horizontal, ...vertical };
 }
 
-export default function BboxOverlay({ imageUrl, imageWidth, imageHeight, boxes, quantities, hoveredSkuId, onHoverSku }) {
+export default function BboxOverlay({
+  imageUrl,
+  imageWidth,
+  imageHeight,
+  boxes,
+  quantities,
+  hoveredSkuId,
+  onHoverSku,
+  captionOverride,
+}) {
   const [selectedBoxId, setSelectedBoxId] = useState(null);
 
   if (!imageUrl || !imageWidth || !imageHeight) {
@@ -43,7 +54,7 @@ export default function BboxOverlay({ imageUrl, imageWidth, imageHeight, boxes, 
 
   return (
     <div>
-      <p className="mb-2 text-xs text-text-muted">Ảnh kệ hàng · di chuột vào dòng bảng để xem vị trí</p>
+      <p className="mb-2 text-xs text-text-muted">{captionOverride ?? DEFAULT_CAPTION}</p>
       <div
         className="relative w-full overflow-hidden rounded-xl border border-card-border"
         style={{ aspectRatio: `${imageWidth} / ${imageHeight}` }}

@@ -29,6 +29,7 @@ export default function GapImageModal({ item, imageUrl, imageWidth, imageHeight,
             quantities={[]}
             hoveredSkuId={null}
             onHoverSku={() => {}}
+            captionOverride="Ảnh kệ hàng · viền đỏ đánh dấu vị trí gap"
           />
         </div>
       </div>
