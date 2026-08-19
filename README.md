@@ -72,9 +72,8 @@ Kết quả AI luôn là bản nháp. Hệ thống chỉ ghi vào tồn kho chí
 *Bước đầu của scan wizard, nhân viên chỉ cần chụp 1 ảnh kệ bằng điện thoại thường.*
 
 ![Kết quả detect trên ảnh thật](img/app_detection_result.png)
-*Khung sản phẩm và khoảng trống do model tự động khoanh vùng, trước khi nhân viên xác nhận.*
+*Khung sản phẩm do model tự động khoanh vùng, trước khi nhân viên xác nhận.*
 
-*(3 ảnh trên đang chờ chụp từ bản chạy thật, sẽ cập nhật sau.)*
 
 ## Cài đặt
 
