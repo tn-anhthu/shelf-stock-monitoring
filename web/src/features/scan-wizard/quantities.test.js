@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'vitest';
-import { computeTotalValue, isDuplicateSku } from './quantities.js';
+import { buildEmptyRow, computeTotalValue, isDuplicateSku } from './quantities.js';
 
 describe('computeTotalValue', () => {
   test('sums facing_count * depth * unit_price across rows', () => {
@@ -17,6 +17,22 @@ describe('computeTotalValue', () => {
 
   test('returns 0 for an empty list', () => {
     expect(computeTotalValue([])).toBe(0);
+  });
+});
+
+describe('buildEmptyRow', () => {
+  test('returns a blank row with no sku_id, not a default catalog pick', () => {
+    expect(buildEmptyRow()).toEqual({
+      sku_id: null,
+      sku_name: null,
+      facing_count: 0,
+      depth: 1,
+      total_quantity: 0,
+      shelf_full_qty: null,
+      unit_price: null,
+      subtotal: 0,
+      flag_status: null,
+    });
   });
 });
 

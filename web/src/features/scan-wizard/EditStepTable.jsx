@@ -51,10 +51,11 @@ export default function EditStepTable({
                 <td className="py-2.5 pr-2 text-text-secondary">{index + 1}</td>
                 <td className="py-2.5 pr-2">
                   <select
-                    value={q.sku_id}
+                    value={q.sku_id ?? ''}
                     onChange={(e) => onSkuChange(index, e.target.value)}
                     className="border-0 border-b border-ink bg-transparent px-0 py-1 font-heading font-medium text-ink focus:outline-none"
                   >
+                    <option value="">— Chọn sản phẩm —</option>
                     {skuOptions.map((item) => (
                       <option key={item.sku_id} value={item.sku_id}>
                         {item.name}

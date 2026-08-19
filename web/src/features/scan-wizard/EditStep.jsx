@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { isDuplicateSku } from './quantities.js';
+import { isDuplicateSku, buildEmptyRow } from './quantities.js';
 import EditStepTable from './EditStepTable.jsx';
 import EditStepCards from './EditStepCards.jsx';
 import BboxOverlay from './BboxOverlay.jsx';
@@ -83,22 +83,7 @@ export default function EditStep({
   }
 
   function handleAddRow() {
-    const catalogEntry = availableToAdd[0];
-    if (!catalogEntry) return;
-    setQuantities((prev) => [
-      ...prev,
-      {
-        sku_id: catalogEntry.sku_id,
-        sku_name: catalogEntry.name,
-        facing_count: 0,
-        depth: 1,
-        total_quantity: 0,
-        shelf_full_qty: catalogEntry.shelf_full_qty,
-        unit_price: catalogEntry.price,
-        subtotal: 0,
-        flag_status: null,
-      },
-    ]);
+    setQuantities((prev) => [...prev, buildEmptyRow()]);
   }
 
   return (
