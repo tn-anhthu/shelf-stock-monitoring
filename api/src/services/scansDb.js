@@ -44,15 +44,26 @@ function createScansDb(dbPath = defaultDbPath()) {
     db.exec(`ALTER TABLE scans ADD COLUMN last_updated_at TEXT`);
     db.exec(`UPDATE scans SET last_updated_at = confirmed_at WHERE last_updated_at IS NULL`);
   }
+  if (!columnsAfterCreate.includes('image_path')) {
+    db.exec(`ALTER TABLE scans ADD COLUMN image_path TEXT`);
+  }
+  if (!columnsAfterCreate.includes('image_width')) {
+    db.exec(`ALTER TABLE scans ADD COLUMN image_width INTEGER`);
+  }
+  if (!columnsAfterCreate.includes('image_height')) {
+    db.exec(`ALTER TABLE scans ADD COLUMN image_height INTEGER`);
+  }
 
   function insertScan({ scanId, category, container, quantities, totalValue, boxes }) {
-    const existing = db.prepare('SELECT confirmed_at, boxes FROM scans WHERE scan_id = ?').get(scanId);
+    const existing = db
+      .prepare('SELECT confirmed_at, boxes, image_path, image_width, image_height FROM scans WHERE scan_id = ?')
+      .get(scanId);
     const now = new Date().toISOString();
     const boxesToStore = boxes !== undefined ? boxes : existing ? JSON.parse(existing.boxes) : [];
 
     db.prepare(
-      `INSERT OR REPLACE INTO scans (scan_id, category, container, quantities, total_value, boxes, confirmed_at, last_updated_at)
-       VALUES (@scanId, @category, @container, @quantities, @totalValue, @boxes, @confirmedAt, @lastUpdatedAt)`,
+      `INSERT OR REPLACE INTO scans (scan_id, category, container, quantities, total_value, boxes, confirmed_at, last_updated_at, image_path, image_width, image_height)
+       VALUES (@scanId, @category, @container, @quantities, @totalValue, @boxes, @confirmedAt, @lastUpdatedAt, @imagePath, @imageWidth, @imageHeight)`,
     ).run({
       scanId,
       category,
@@ -62,6 +73,9 @@ function createScansDb(dbPath = defaultDbPath()) {
       boxes: JSON.stringify(boxesToStore),
       confirmedAt: existing ? existing.confirmed_at : now,
       lastUpdatedAt: now,
+      imagePath: existing ? existing.image_path : null,
+      imageWidth: existing ? existing.image_width : null,
+      imageHeight: existing ? existing.image_height : null,
     });
   }
 
@@ -79,7 +93,18 @@ function createScansDb(dbPath = defaultDbPath()) {
     return { ...row, quantities: JSON.parse(row.quantities), boxes: JSON.parse(row.boxes) };
   }
 
-  return { db, insertScan, getScanById, getLatestScan };
+  function setScanImage(scanId, { imagePath, imageWidth, imageHeight }) {
+    const now = new Date().toISOString();
+    const result = db
+      .prepare(
+        `UPDATE scans SET image_path = @imagePath, image_width = @imageWidth, image_height = @imageHeight, last_updated_at = @lastUpdatedAt
+         WHERE scan_id = @scanId`,
+      )
+      .run({ scanId, imagePath, imageWidth, imageHeight, lastUpdatedAt: now });
+    return result.changes > 0;
+  }
+
+  return { db, insertScan, getScanById, getLatestScan, setScanImage };
 }
 
 const scansDb = createScansDb();

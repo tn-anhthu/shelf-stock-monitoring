@@ -65,7 +65,7 @@ describe('scansDb migration', () => {
   test('creates a fresh DB with category/container columns directly when no file exists yet', () => {
     const { db } = createScansDb(dbPath);
     const columns = db.prepare('PRAGMA table_info(scans)').all().map((col) => col.name);
-    expect(columns).toEqual(['scan_id', 'category', 'container', 'quantities', 'total_value', 'confirmed_at', 'boxes', 'last_updated_at']);
+    expect(columns).toEqual(['scan_id', 'category', 'container', 'quantities', 'total_value', 'confirmed_at', 'boxes', 'last_updated_at', 'image_path', 'image_width', 'image_height']);
     db.close();
   });
 });
@@ -142,6 +142,103 @@ describe('scansDb boxes + confirmed_at/last_updated_at', () => {
     const migrated = getScanById('old-1');
     expect(migrated.boxes).toEqual([]);
     expect(migrated.last_updated_at).toBe('2026-08-01T00:00:00.000Z');
+    db.close();
+  });
+});
+
+describe('scansDb image fields', () => {
+  let dbPath;
+
+  beforeEach(() => {
+    dbPath = path.join(os.tmpdir(), `scans-image-test-${crypto.randomUUID()}.db`);
+  });
+
+  afterEach(() => {
+    fs.rmSync(dbPath, { force: true });
+  });
+
+  test('new scans have null image fields by default', () => {
+    const { insertScan, getScanById, db } = createScansDb(dbPath);
+    insertScan({ scanId: 'img-1', category: 'mi-goi', container: 'ke-a', quantities: [], totalValue: 0 });
+    const scan = getScanById('img-1');
+    expect(scan.image_path).toBeNull();
+    expect(scan.image_width).toBeNull();
+    expect(scan.image_height).toBeNull();
+    db.close();
+  });
+
+  test('setScanImage sets image_path/width/height on an existing scan and returns true', () => {
+    const { insertScan, setScanImage, getScanById, db } = createScansDb(dbPath);
+    insertScan({ scanId: 'img-2', category: 'mi-goi', container: 'ke-a', quantities: [], totalValue: 0 });
+    const updated = setScanImage('img-2', { imagePath: 'img-2.jpg', imageWidth: 4032, imageHeight: 3024 });
+    expect(updated).toBe(true);
+
+    const scan = getScanById('img-2');
+    expect(scan.image_path).toBe('img-2.jpg');
+    expect(scan.image_width).toBe(4032);
+    expect(scan.image_height).toBe(3024);
+    db.close();
+  });
+
+  test('setScanImage returns false and changes nothing for a scan_id that does not exist', () => {
+    const { setScanImage, getScanById, db } = createScansDb(dbPath);
+    const updated = setScanImage('does-not-exist', { imagePath: 'x.jpg', imageWidth: 100, imageHeight: 100 });
+    expect(updated).toBe(false);
+    expect(getScanById('does-not-exist')).toBeNull();
+    db.close();
+  });
+
+  test('insertScan preserves an already-set image when called again without image data (oos_confirmation write-back path)', () => {
+    const { insertScan, setScanImage, getScanById, db } = createScansDb(dbPath);
+    insertScan({ scanId: 'img-3', category: 'mi-goi', container: 'ke-a', quantities: [{ sku_id: 'a' }], totalValue: 0 });
+    setScanImage('img-3', { imagePath: 'img-3.jpg', imageWidth: 4032, imageHeight: 3024 });
+
+    insertScan({ scanId: 'img-3', category: 'mi-goi', container: 'ke-a', quantities: [{ sku_id: 'a' }, { sku_id: 'b' }], totalValue: 100 });
+
+    const scan = getScanById('img-3');
+    expect(scan.image_path).toBe('img-3.jpg');
+    expect(scan.image_width).toBe(4032);
+    expect(scan.image_height).toBe(3024);
+    db.close();
+  });
+
+  test('adds image_path/image_width/image_height columns to a pre-existing DB missing them, without losing existing data', () => {
+    const legacyDb = new Database(dbPath);
+    legacyDb.exec(`
+      CREATE TABLE scans (
+        scan_id TEXT PRIMARY KEY,
+        category TEXT NOT NULL,
+        container TEXT NOT NULL,
+        quantities TEXT NOT NULL,
+        total_value REAL NOT NULL,
+        boxes TEXT NOT NULL DEFAULT '[]',
+        confirmed_at TEXT NOT NULL,
+        last_updated_at TEXT
+      )
+    `);
+    legacyDb
+      .prepare(
+        `INSERT INTO scans (scan_id, category, container, quantities, total_value, boxes, confirmed_at, last_updated_at)
+         VALUES (@scanId, @category, @container, @quantities, @totalValue, @boxes, @confirmedAt, @lastUpdatedAt)`,
+      )
+      .run({
+        scanId: 'old-img-1',
+        category: 'mi-goi',
+        container: 'ke-a',
+        quantities: '[]',
+        totalValue: 0,
+        boxes: '[]',
+        confirmedAt: '2026-08-01T00:00:00.000Z',
+        lastUpdatedAt: '2026-08-01T00:00:00.000Z',
+      });
+    legacyDb.close();
+
+    const { getScanById, db } = createScansDb(dbPath);
+    const migrated = getScanById('old-img-1');
+    expect(migrated.image_path).toBeNull();
+    expect(migrated.image_width).toBeNull();
+    expect(migrated.image_height).toBeNull();
+    expect(migrated.quantities).toEqual([]);
     db.close();
   });
 });
