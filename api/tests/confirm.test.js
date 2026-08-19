@@ -38,7 +38,7 @@ describe('POST /confirm', () => {
       container: 'ke-a',
       total_value: 60000,
     });
-    expect(saved.quantities).toEqual(QUANTITIES);
+    expect(saved.quantities).toEqual([{ ...QUANTITIES[0], source: 'scan' }]);
   });
 
   test('rejects a request with an empty quantities array with 400', async () => {
@@ -101,5 +101,43 @@ describe('POST /confirm', () => {
       total_value: 60000,
     });
     expect(res3.status).toBe(400);
+  });
+
+  test('stores boxes when provided in the payload', async () => {
+    const boxes = [{ box_id: 'b1', type: 'gap', bbox: [1, 2, 3, 4], sku_id: null, needs_review: false }];
+    const res = await request(app).post('/confirm').send({
+      scan_id: 'scan-boxes-1',
+      category: 'mi-goi',
+      container: 'ke-a',
+      quantities: QUANTITIES,
+      total_value: 60000,
+      boxes,
+    });
+    expect(res.status).toBe(200);
+    expect(scansDb.getScanById('scan-boxes-1').boxes).toEqual(boxes);
+  });
+
+  test('defaults source to "scan" on quantities rows that do not already specify it', async () => {
+    const res = await request(app).post('/confirm').send({
+      scan_id: 'scan-source-1',
+      category: 'mi-goi',
+      container: 'ke-a',
+      quantities: QUANTITIES,
+      total_value: 60000,
+    });
+    expect(res.status).toBe(200);
+    expect(scansDb.getScanById('scan-source-1').quantities[0].source).toBe('scan');
+  });
+
+  test('keeps an explicit source value instead of overwriting it', async () => {
+    const res = await request(app).post('/confirm').send({
+      scan_id: 'scan-source-2',
+      category: 'mi-goi',
+      container: 'ke-a',
+      quantities: [{ ...QUANTITIES[0], source: 'oos_confirmation' }],
+      total_value: 60000,
+    });
+    expect(res.status).toBe(200);
+    expect(scansDb.getScanById('scan-source-2').quantities[0].source).toBe('oos_confirmation');
   });
 });

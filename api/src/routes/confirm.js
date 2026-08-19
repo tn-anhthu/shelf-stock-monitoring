@@ -11,6 +11,7 @@ router.post('/confirm', (req, res) => {
     container,
     quantities,
     total_value: totalValue,
+    boxes,
   } = req.body;
 
   if (!scanId || !category || !container || !Array.isArray(quantities) || quantities.length === 0) {
@@ -23,7 +24,16 @@ router.post('/confirm', (req, res) => {
     return res.status(400).json({ error: 'category/container is missing or not active' });
   }
 
-  scansDb.insertScan({ scanId, category, container, quantities, totalValue: totalValue ?? 0 });
+  const quantitiesWithSource = quantities.map((q) => ({ ...q, source: q.source ?? 'scan' }));
+
+  scansDb.insertScan({
+    scanId,
+    category,
+    container,
+    quantities: quantitiesWithSource,
+    totalValue: totalValue ?? 0,
+    boxes,
+  });
 
   return res.status(200).json({ confirmed: true, scan_id: scanId });
 });
