@@ -74,6 +74,20 @@ describe('dashboard service', () => {
     const payload = buildDashboardPayload(scanRow, catalog);
     expect(Array.isArray(payload.missing_items)).toBe(true);
   });
+
+  test('buildDashboardPayload builds image_url from image_path, or null when the scan has no image', () => {
+    const withImage = { scan_id: 's', confirmed_at: 't', quantities: QUANTITIES, boxes: [], image_path: 'abc.jpg', image_width: 4032, image_height: 3024 };
+    const payloadWithImage = buildDashboardPayload(withImage, catalog);
+    expect(payloadWithImage.image_url).toBe('/uploads/abc.jpg');
+    expect(payloadWithImage.image_width).toBe(4032);
+    expect(payloadWithImage.image_height).toBe(3024);
+
+    const withoutImage = { scan_id: 's', confirmed_at: 't', quantities: QUANTITIES, boxes: [], image_path: null, image_width: null, image_height: null };
+    const payloadWithoutImage = buildDashboardPayload(withoutImage, catalog);
+    expect(payloadWithoutImage.image_url).toBeNull();
+    expect(payloadWithoutImage.image_width).toBeNull();
+    expect(payloadWithoutImage.image_height).toBeNull();
+  });
 });
 
 describe('GET /dashboard', () => {
@@ -138,5 +152,15 @@ describe('GET /dashboard', () => {
     scansDb.insertScan({ scanId: 'dash-scan-3', category: 'mi-goi', container: 'ke-a', quantities: QUANTITIES, totalValue: 1200 });
     const res = await request(app).get('/dashboard').query({ category: 'mi-goi', container: 'ke-a' });
     expect(res.body.missing_items).toEqual([]);
+  });
+
+  test('returns image_url/image_width/image_height for a scan with a stored image', async () => {
+    scansDb.insertScan({ scanId: 'dash-img-1', category: 'nuoc-giai-khat', container: 'tu-a', quantities: QUANTITIES, totalValue: 1200 });
+    scansDb.setScanImage('dash-img-1', { imagePath: 'dash-img-1.jpg', imageWidth: 4032, imageHeight: 3024 });
+
+    const res = await request(app).get('/dashboard').query({ category: 'nuoc-giai-khat', container: 'tu-a' });
+    expect(res.body.image_url).toBe('/uploads/dash-img-1.jpg');
+    expect(res.body.image_width).toBe(4032);
+    expect(res.body.image_height).toBe(3024);
   });
 });
