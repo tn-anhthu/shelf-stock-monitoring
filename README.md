@@ -1,97 +1,129 @@
+<p align="center">
+  <img src="web/public/shelfsense.png" alt="ShelfSense cover" width="100%">
+</p>
+
 # ShelfSense
 
-Trợ lý kiểm kê kệ hàng bằng ảnh chụp, dành cho cửa hàng/siêu thị mini không có ngân sách lắp camera cố định hay hợp đồng SaaS enterprise.
+Trợ lý kiểm kê kệ hàng bằng ảnh chụp, cho cửa hàng và siêu thị mini không có ngân sách lắp camera cố định hay hợp đồng SaaS enterprise.
 
-Nhân viên chụp 1 ảnh mảng kệ bằng điện thoại thường → hệ thống tự khoanh vùng, đếm số lượng từng sản phẩm, phát hiện sản phẩm sắp hết/hết hàng → hiển thị trên dashboard, không cần đếm tay hay dò thủ công xem kệ đang thiếu gì.
+> Dự án portfolio cá nhân (khóa AI thực chiến, 5 tuần, 20/7 đến 25/8/2026), không phải sản phẩm thương mại, không deploy public.
 
-> Đây là dự án portfolio, không phải sản phẩm thương mại thật
+## Vấn đề
 
-## 1. Vấn đề
+Kiểm kê tồn kho trên kệ hiện chủ yếu làm thủ công: nhân viên đếm tay từng sản phẩm, dễ bỏ sót vị trí trống dẫn đến mất doanh thu, và không có công cụ theo dõi tình trạng kệ nếu không đầu tư hạ tầng lớn.
 
-Kiểm kê tồn kho trên kệ hiện chủ yếu làm thủ công: nhân viên đếm tay từng sản phẩm, dễ bỏ sót vị trí trống dẫn đến mất doanh thu, và không có công cụ theo dõi tình trạng kệ hàng nếu không đầu tư hạ tầng lớn.
+Các giải pháp thị trường (Trax, Simbe Robotics/Tally, Focal Systems, AiFi, Scandit ShelfView) giải quyết đúng bài toán này nhưng nhắm vào chuỗi bán lẻ lớn: cần camera cố định, robot tự hành, hợp đồng dài hạn, hoặc train riêng model theo catalog từng khách hàng. Cửa hàng và siêu thị mini không có ngân sách và quy mô để tiếp cận các giải pháp này.
 
-Các giải pháp thị trường hiện có (Trax, Simbe Robotics/Tally, Focal Systems, AiFi, Scandit ShelfView...) giải quyết đúng bài toán này nhưng nhắm vào chuỗi bán lẻ lớn/FMCG enterprise: cần camera cố định, robot tự hành, hợp đồng dài hạn, hoặc catalog train riêng theo từng khách hàng. Cửa hàng/siêu thị mini không có ngân sách và quy mô để tiếp cận các giải pháp này.
+## Giải pháp
 
-**Khác biệt kỹ thuật của ShelfSense:** chỉ cần 1 ảnh chụp bằng điện thoại thường, dùng zero-shot classification (SigLIP2 retrieval) thay vì train riêng theo catalog của từng cửa hàng. Thêm sản phẩm mới vào catalog không cần train lại model, khác với hướng closed-set classifier của nhiều đối thủ enterprise.
+Nhân viên chụp 1 ảnh mảng kệ bằng điện thoại thường. Hệ thống tự khoanh vùng, đếm số lượng từng sản phẩm, phát hiện sản phẩm sắp hết hoặc hết hàng, rồi hiển thị lên dashboard.
 
+Khác biệt kỹ thuật chính: dùng zero-shot classification (SigLIP2 embedding retrieval) thay vì train riêng model theo catalog của từng cửa hàng. Thêm SKU mới vào catalog không cần train lại model, khác với hướng closed-set classifier của nhiều đối thủ enterprise.
 
-## 2. Research Question
+Kết quả AI luôn là bản nháp. Hệ thống chỉ ghi vào tồn kho chính thức sau khi nhân viên xác nhận.
 
-**1. Zero-shot embedding retrieval (SigLIP2) có đủ chính xác để thay thế closed-set classifier trong catalog thay đổi liên tục không?**
+## Kiến trúc
 
-Đã có câu trả lời một phần. Không hoàn toàn đủ. SigLIP2 nhầm nghiêm trọng giữa các SKU hình dạng bao bì giống nhau (khác hãng: Pepsi/7Up/Mountain Dew; cùng hãng khác vị: Vinamilk có/không đường). Cosine similarity giữa cặp SKU cùng hãng khác vị (0.926) còn cao hơn cặp khác hãng (0.860); bản chất do image-embedding thuần không nắm bắt được khác biệt nhỏ về chữ/nhãn.
+3 tầng, chạy local, không cloud:
 
-**2. Có thể phát hiện khoảng trống kệ (gap) chỉ bằng heuristic hình học, không cần train model riêng, hay không?**
+| Tầng | Công nghệ | Vai trò |
+|---|---|---|
+| `web` | React 19, Vite, Tailwind v4 | Scan wizard (Upload, Crop, Analyze, Edit, Confirm), Dashboard theo category và kệ |
+| `api` | Node.js, Express 5, SQLite (better-sqlite3) | Proxy mỏng, validate và format dữ liệu giữa web và ml-service |
+| `ml-service` | Python, FastAPI | Pipeline CV: detect, classify, gap detection, LLM verify |
 
-Đã có câu trả lời, đã hiệu chỉnh. Có thể, nhưng ngưỡng ban đầu (1.5× chiều rộng trung bình sản phẩm) sai theo số liệu thật, phải hạ xuống 0.9×; heuristic chỉ hoạt động đúng sau khi thêm bước merge box vỡ (`merge_adjacent_fragments`) và lọc box rác (`filter_anomalous_boxes`) trước khi tính gap.
+## Pipeline
 
-**3. Khi embedding retrieval không đủ phân biệt, dùng LLM làm lớp verify có khả thi về chi phí/độ chính xác không, và nên escalate có chọn lọc hay verify toàn bộ?**
+1. **Detection**: YOLO26n fine-tune trên SKU-110K, khoanh vùng từng sản phẩm trên ảnh kệ (dense, overlapping objects).
+2. **Classification**: crop từng box, dùng SigLIP2 embedding zero-shot để match với catalog sản phẩm (retrieval-based, không cần train riêng cho SKU mới).
+3. **LLM verify**: mọi match từ SigLIP2 đều được xác nhận lại qua LLM (Gemini, fallback OpenRouter), vì điểm số embedding không đủ tin cậy để tự quyết định khi nào cần hỏi thêm.
+4. **Gap detection**: 2 tầng, geometry sinh ứng viên khoảng trống trên kệ, VLM verify lại từng ứng viên (Gemma qua OpenRouter, fallback GPT) để loại phantom gap.
+5. **Depth multiplier**: nhân viên tự nhập số lớp sản phẩm xếp sâu phía sau mỗi vị trí, chưa tự động suy luận độ sâu.
+6. **Aggregate và Dashboard**: cộng dồn số lượng theo SKU, so với ngưỡng từng SKU để gắn cờ Đủ, Sắp hết, hoặc Hết hàng.
 
-Đang chỉnh sửa. Đã xác nhận LLM escalation cho kết quả đúng hơn trên case thật trong scope demo, chi phí thấp, khả thi về mặt kỹ thuật. Kiến trúc đã chốt là **LLM verify mọi match** (không chỉ escalation-only), vì điểm số SigLIP2 không đáng tin để tự quyết định "khi nào cần hỏi LLM". SigLIP2 vẫn giữ vai trò retrieval rút gọn top-K candidate, LLM luôn là bên quyết định cuối. Đánh đổi chính là thời gian (mọi detection đều gọi API), chưa phải chi phí.
+## Kết quả
 
-**4. Các loại lỗi detection (box bị chẻ, box trùng, box rác) ảnh hưởng thế nào đến độ chính xác đếm số lượng và gap detection, và có cần xử lý khác nhau theo từng loại lỗi không?**
+**Detection (YOLO26n, full test set SKU-110K, 2920 ảnh):**
 
-Đang chỉnh sửa. Đo IoU thật trên 29 candidate/4 ảnh xác nhận 2 loại lỗi có bản chất khác nhau: box bị chẻ (fragmentation, IoU ≈ 0.000–0.03) so với box trùng (duplicate, IoU 0.5–0.7) → cần 2 cách sửa riêng biệt (merge theo x-overlap/y-gap/aspect ratio cho fragmentation; chỉnh tham số `iou` của NMS cho duplicate).
+| Model | Precision | Recall | mAP50 | mAP50-95 |
+|---|---|---|---|---|
+| YOLOv8n (baseline) | 0.866 | 0.783 | 0.843 | 0.491 |
+| YOLO26n (production) | 0.892 | 0.828 | 0.888 | 0.536 |
 
-Đối chiếu tài liệu: RQ1 và RQ3 liên quan trực tiếp đến paper #3 (few-shot recognition) và paper #4 (Enhanced OOS Detection), cả hai đều đối mặt vấn đề tương tự (phân biệt SKU dễ nhầm, catalog không cố định) và có thể dùng làm cơ sở đối chiếu khi viết phần thảo luận cho báo cáo cuối.
+![So sánh benchmark detection](img/detection_benchmark_comparison.png)
+![Kết quả detection trên ảnh thật](img/detection_real_image_results.png)
 
-## 3. Scope
+**Classification (SigLIP2 zero-shot + LLM verify, eval set 150 dòng ảnh thật, catalog 144 SKU):**
 
-Giới hạn nhóm hàng FMCG có bao bì (nước giải khát, mì gói, bánh kẹo...), catalog ~100 SKU thật của 1 kệ cụ thể tại 1 siêu thị tiện lợi, làm demo target. Chạy local qua Streamlit/Gradio, lưu trữ bằng SQLite, không deploy public, không dùng cloud DB.
+- SigLIP2 retrieval thuần: recall@1 = 57.1%, recall@5 = 92.9%.
+- Sau khi thêm LLM verify: 85.7% (84/98) khi catalog có đúng SKU cần tìm, 80.7% (121/150) tính cả trường hợp catalog thiếu SKU và cần model biết từ chối trả lời thay vì đoán bừa.
+- Phát hiện đáng chú ý: khi catalog không có SKU đúng, LLM chỉ từ chối đúng cách 75% số lần, 25% còn lại vẫn cố gán 1 SKU sai thay vì báo "không xác định". Đây là hướng cải thiện tiếp theo (tune ngưỡng từ chối của prompt verify).
 
-Chi tiết đầy đủ (persona, user stories, feature spec, acceptance criteria, backend/frontend requirements) xem
-[`docs/specs/mvp-design.md`](docs/specs/mvp-design.md).
+![Recall theo tầng classification](img/classification_recall_at_k.png)
 
-## 4. Pipeline
+**Gap detection (2 tầng geometry + VLM-verify, 19 ảnh test thật):** 55 ứng viên khoảng trống, xác nhận 4 gap thật, 51 không phải gap, 0 trường hợp không chắc chắn.
 
-1. **Detection**: YOLO26n fine-tune trên SKU-110K để khoanh vùng từng sản phẩm trên ảnh kệ (dense/overlapping objects).
-2. **Classification**: crop từng box, dùng SigLIP2 embedding zero-shot để match với catalog sản phẩm (retrieval-based, không cần train riêng cho từng SKU mới).
-3. **Gap detection**: khoanh vùng khoảng trống giữa các sản phẩm đã detect trong cùng 1 hàng kệ bằng heuristic hình học (so khoảng cách giữa box liền kề với chiều rộng trung bình sản phẩm trong hàng).
-4. **Depth multiplier (human-in-the-loop)**: nhân viên tự nhập tay số lớp sản phẩm xếp sâu phía sau mỗi vị trí (không tự động suy luận độ sâu).
-5. **Aggregate & Pricing**: cộng dồn số lượng theo SKU, nhân giá theo catalog → tổng giá trị tồn kho, cờ Đủ/Sắp hết/Hết hàng theo ngưỡng từng SKU.
-6. **Low-confidence warning**: banner cảnh báo khi confidence trung bình 1 khu vực thấp, gợi ý chụp lại (tối đa 1 vòng, không có luồng xác nhận đa bước).
+## Giao diện
 
-Kết quả AI đề xuất chỉ là draft. Hệ thống chỉ ghi vào tồn kho chính thức sau khi nhân viên xác nhận.
+![Dashboard](img/app_dashboard.png)
+*Dashboard theo category và kệ, hiển thị trạng thái Đủ, Sắp hết, Hết hàng.*
 
-## Roadmap
+![Bước Upload](img/app_upload_step.png)
+*Bước đầu của scan wizard, nhân viên chỉ cần chụp 1 ảnh kệ bằng điện thoại thường.*
 
-Roadmap 5 tuần (20/7 → 23/8/2026):
+![Kết quả detect trên ảnh thật](img/app_detection_result.png)
+*Khung sản phẩm và khoảng trống do model tự động khoanh vùng, trước khi nhân viên xác nhận.*
 
-| Tuần | Mục tiêu chính | Deliverable | Rủi ro |
-|---|---|---|---|
-| 1 (20–26/7) | Catalog + database | Catalog SKU (ảnh, tên, giá, ngưỡng) + schema SQLite + script embedding catalog | Chuẩn bị catalog trễ → giới hạn cứng 15-20 SKU |
-| 2 (27/7–2/8) | Ghép pipeline lõi (chưa UI) | Script: ảnh → detect → classify → confidence flag → depth (giả lập) → pricing → ghi SQLite | Rủi ro cao nhất, nên làm sớm, không dồn cuối |
-| 3 (3–9/8) | Frontend Path 1 + Path 2 | Streamlit/Gradio: scan, annotate, bảng kết quả, nhập depth, xác nhận, banner low-confidence | Ưu tiên chạy được trước, đẹp sau |
-| 4 (10–16/8) | Frontend Path 3 + Dashboard | Màn thêm SKU, dashboard tổng (bảng, tổng giá trị, cờ) | Có thể rút gọn Path 3 nếu trễ |
-| 5 (17–23/8) | Buffer, test, báo cáo | Test end-to-end, sửa bug, (nếu dư) trend chart, demo video, hoàn thiện báo cáo | Buffer bắt buộc, không nhét feature mới |
+*(3 ảnh trên đang chờ chụp từ bản chạy thật, sẽ cập nhật sau.)*
 
-**Thứ tự cắt nếu trễ tiến độ:** bỏ trend chart (nice-to-have) → rút gọn Path 3 → rút gọn UI Path 2 (giữ logic, bớt UI đẹp). Không cắt Path 1 hay database vì đây là xương sống.
+## Cài đặt
 
-## Trạng thái hiện tại
+Yêu cầu: Node.js 18 trở lên, Python 3.10 trở lên.
 
-- [x] **Detection**: benchmark harness (`src/detection/benchmark/`: metrics IoU/precision/recall, SKU-110K loader, checkpoint/zero-shot candidates) → cả hai candidate có sẵn benchmark dưới ngưỡng 0.45, nên fine-tune riêng trên SKU-110K. Bắt đầu với YOLOv8n nano (đạt ngưỡng recall ≥ 0.6 đề ra ban đầu), sau đó migrate sang **YOLO26n** (10/08, checkpoint production hiện tại): precision 0.892, recall 0.828, mAP50 0.888, mAP50-95 0.536, đo trên full test set SKU-110K (2920 ảnh). Xem `docs/detection-notes/detection-log.md`.
-- [x] **Classification**: benchmark CLIP vs SigLIP2 zero-shot retrieval trên subset RPC. SigLIP2 top-1 0.676, top-5 0.952, chọn SigLIP2 cho retrieval. Xem `docs/classification-notes/`.
-- [x] **Catalog** (`src/catalog/`): schema SQLite (catalog/inventory/scan_history), parse CSV seed, fetch ảnh mẫu từ URL, build + lưu embedding SigLIP2 theo SKU, orchestrator seed catalog đầy đủ.
-- [ ] **Pipeline lõi** (`src/pipeline/`): classify crop theo catalog, flag low-confidence, aggregate số lượng/giá trị/cờ tồn kho, orchestrator `run_scan`/`persist_scan` nối detect → classify → confidence → aggregate → ghi SQLite.
-- [x] **Detection post-processing**: merge box vỡ (`merge_adjacent_fragments`), lọc box rác (`filter_anomalous_boxes`), gap detection theo hàng kệ, đã wire vào `run_scan`.
-- [ ] **LLM escalation** (RQ3): experiment harness xong (multi-image reference-photo mode, hỗ trợ input HEIC); production integration (`escalate_to_llm` gắn vào `classify_crop`) đang làm.
-- [ ] Frontend Streamlit/Gradio (Path 1/2/3): chưa bắt đầu, theo roadmap là việc của tuần 3-4.
-- [ ] Dashboard tổng hợp.
+```bash
+# web
+cd web && npm install && npm run dev
 
-## Setup
+# api
+cd api && npm install && npm start
 
-- Dataset nặng (SKU-110K) nên stream/subset.
-- 4 virtualenv riêng do các bộ dependency ghim version đá nhau (không gộp được vào 1 file `requirements.txt` chung):
-  - `.venv-benchmark` ← `requirements/benchmark.txt` (ultralytics 8.0.43, ghim để đọc checkpoint pickle của YOLOv8n cũ, không load được YOLO26n, chỉ còn dùng cho đối chiếu lịch sử)
-  - `.venv-train` ← `requirements/train.txt` (ultralytics ≥8.3, thực tế cần bản ≥8.4 để load YOLO26n, dùng để fine-tune/evaluate)
-  - `.venv-classify` ← `requirements/classify.txt` (SigLIP2/transformers, cho `src/catalog/build_embeddings.py`)
-  - `.venv-e2e` ← `requirements/e2e.txt` (kết hợp YOLO checkpoint-compatible + SigLIP2 chạy chung 1 process, cho `scripts/run_scan_e2e.py`)
+# ml-service
+cd ml-service
+pip install -r requirements.txt
+cp ../.env.example ../.env   # điền API key thật (Gemini, OpenRouter)
+uvicorn app:app --port 8001
+```
 
-## Future Work
+3 lệnh trên đủ để chạy toàn bộ app (dùng model đã fine-tune sẵn, có trong repo). Việc train lại hoặc benchmark model từ đầu cần thêm vài virtualenv riêng do các bộ dependency ghim version khác nhau, không nằm trong luồng chạy app thông thường. Chi tiết xem [`docs/specs/mvp-design.md`](docs/specs/mvp-design.md).
 
-- Chuẩn hóa tên SKU liên siêu thị / xử lý biến thể tên gọi giữa các nhà bán lẻ.
-- Depth-multiplier tự động (suy luận độ sâu từ ảnh) thay vì nhập tay.
-- VLM/OCR làm fallback nhận diện cho SKU chưa có trong catalog.
-- Continual learning từ feedback người dùng.
-- Lịch sử nhiều lần chụp theo thời gian + biểu đồ xu hướng.
-- Multi-tenant, deploy cloud, migrate sang Postgres/Supabase khi cần multi-store thật.
+## Cấu trúc thư mục
+
+```
+web/            React scan wizard và dashboard
+api/            Node/Express proxy layer
+ml-service/     FastAPI, entrypoint cho pipeline CV
+src/            Logic pipeline: detection, classification, catalog, gap detection
+notebooks/      EDA, so sánh model, eval classification, eval gap detection
+docs/           Quyết định kỹ thuật, log thí nghiệm, spec chi tiết
+data/           Catalog seed, ảnh test, kết quả eval
+```
+
+## Tài liệu chi tiết
+
+- [`docs/specs/mvp-design.md`](docs/specs/mvp-design.md): persona, user story, acceptance criteria đầy đủ.
+- [`docs/detection-notes/detection-log.md`](docs/detection-notes/detection-log.md) và [`docs/classification-notes/`](docs/classification-notes/): log thí nghiệm, quyết định kỹ thuật theo từng giai đoạn.
+- [`docs/adr/`](docs/adr/): các quyết định kiến trúc.
+- `notebooks/`: EDA, so sánh baseline và model, eval classification và gap detection kèm số liệu chi tiết.
+
+## Giới hạn đã biết
+
+- Catalog demo 144 SKU của 1 kệ cụ thể tại 1 siêu thị tiện lợi, chưa test trên tạp hóa layout lộn xộn.
+- Không có dữ liệu bán hàng (POS) thật, "giá trị bỏ lỡ" trên dashboard là ước tính quy mô cơ hội bán hàng bị bỏ lỡ, không phải doanh thu thật.
+- Chạy local, chưa multi-tenant, chưa deploy public.
+
+## Định hướng tiếp theo
+
+- Suy luận SKU đang thiếu tại vị trí gap dựa trên sản phẩm liền kề (neighbor inference).
+- Giảm tỷ lệ LLM ép gán sai SKU khi catalog thiếu sản phẩm, phát hiện từ eval 150 dòng ở trên.
+- Depth multiplier tự động thay vì nhập tay.
+- Lưu lịch sử nhiều lần chụp theo thời gian, hiển thị biểu đồ xu hướng.
