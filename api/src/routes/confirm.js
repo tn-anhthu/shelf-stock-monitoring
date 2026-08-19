@@ -1,6 +1,5 @@
 const express = require('express');
 const fs = require('node:fs');
-const path = require('node:path');
 const multer = require('multer');
 const { scansDb } = require('../services/scansDb');
 const { isActiveShelf } = require('../config/shelfRegistry');
