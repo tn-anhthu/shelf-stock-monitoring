@@ -1,6 +1,8 @@
 // KPI / status-breakdown / attention-list computation for the Inventory page.
 // docs/superpowers/specs/2026-08-10-dashboard-design.md §4.3-4.4.
 
+const { findMissingItemSuggestions } = require('./neighborInference');
+
 function computeMissedValue(item) {
   if (item.flag_status === 'ok') return 0;
   return Math.max(0, (item.shelf_full_qty - item.total_quantity) * item.unit_price);
@@ -42,7 +44,7 @@ function computeAttentionList(quantities) {
     });
 }
 
-function buildDashboardPayload(scanRow) {
+function buildDashboardPayload(scanRow, catalog) {
   if (!scanRow) {
     return { has_data: false };
   }
@@ -56,6 +58,7 @@ function buildDashboardPayload(scanRow) {
     status_breakdown: computeStatusBreakdown(quantities),
     attention_list: computeAttentionList(quantities),
     full_table: quantities,
+    missing_items: findMissingItemSuggestions(scanRow, catalog),
   };
 }
 

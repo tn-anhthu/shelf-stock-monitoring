@@ -1,7 +1,8 @@
 const request = require('supertest');
 const app = require('../src/app');
 const { scansDb } = require('../src/services/scansDb');
-const { computeKpis, computeStatusBreakdown, computeAttentionList } = require('../src/services/dashboard');
+const { catalog } = require('../src/services/catalog');
+const { computeKpis, computeStatusBreakdown, computeAttentionList, buildDashboardPayload } = require('../src/services/dashboard');
 
 const QUANTITIES = [
   {
@@ -59,6 +60,20 @@ describe('dashboard service', () => {
     expect(list[0].missed_value).toBe(250);
     expect(list[1].missed_value).toBe(1600);
   });
+
+  test('buildDashboardPayload includes missing_items computed from scanRow.boxes and catalog', () => {
+    const scanRow = {
+      scan_id: 's',
+      confirmed_at: 't',
+      quantities: QUANTITIES,
+      boxes: [
+        { box_id: 'p1', type: 'product', bbox: [0, 10, 90, 60], sku_id: 'a', is_unknown: false, excluded_from_count: false, needs_review: false },
+        { box_id: 'g1', type: 'gap', bbox: [100, 10, 200, 60], sku_id: null, is_unknown: false, excluded_from_count: false, needs_review: false },
+      ],
+    };
+    const payload = buildDashboardPayload(scanRow, catalog);
+    expect(Array.isArray(payload.missing_items)).toBe(true);
+  });
 });
 
 describe('GET /dashboard', () => {
@@ -96,5 +111,32 @@ describe('GET /dashboard', () => {
     expect(res.body.status_breakdown).toEqual({ ok: 1, low: 1, out: 1 });
     expect(res.body.attention_list.map((q) => q.sku_id)).toEqual(['c', 'b']);
     expect(res.body.full_table).toHaveLength(3);
+  });
+
+  test('returns missing_items derived from the scan boxes', async () => {
+    const boxes = [
+      { box_id: 'p1', type: 'product', bbox: [0, 10, 90, 60], sku_id: 'choco_pie_org', is_unknown: false, excluded_from_count: false, needs_review: false },
+      { box_id: 'g1', type: 'gap', bbox: [100, 10, 200, 60], sku_id: null, is_unknown: false, excluded_from_count: false, needs_review: false },
+    ];
+    scansDb.insertScan({
+      scanId: 'dash-scan-2',
+      category: 'nuoc-giai-khat',
+      container: 'tu-a',
+      quantities: [{ sku_id: 'choco_pie_org', sku_name: 'A', facing_count: 1, depth: 1, total_quantity: 1, shelf_full_qty: 10, unit_price: 30000, subtotal: 30000, flag_status: 'low' }],
+      totalValue: 30000,
+      boxes,
+    });
+
+    const res = await request(app).get('/dashboard').query({ category: 'nuoc-giai-khat', container: 'tu-a' });
+    expect(res.status).toBe(200);
+    const item = res.body.missing_items.find((m) => m.gap_box_id === 'g1');
+    expect(item).toBeDefined();
+    expect(item.nearby_skus).toEqual([{ sku_id: 'choco_pie_org', sku_name: expect.any(String) }]);
+  });
+
+  test('returns missing_items: [] when the latest scan has no boxes stored (pre-migration scan)', async () => {
+    scansDb.insertScan({ scanId: 'dash-scan-3', category: 'mi-goi', container: 'ke-a', quantities: QUANTITIES, totalValue: 1200 });
+    const res = await request(app).get('/dashboard').query({ category: 'mi-goi', container: 'ke-a' });
+    expect(res.body.missing_items).toEqual([]);
   });
 });

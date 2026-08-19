@@ -1,6 +1,7 @@
 const express = require('express');
 const { isActiveShelf } = require('../config/shelfRegistry');
 const { scansDb } = require('../services/scansDb');
+const { catalog } = require('../services/catalog');
 const { buildDashboardPayload } = require('../services/dashboard');
 
 const router = express.Router();
@@ -13,7 +14,7 @@ router.get('/dashboard', (req, res) => {
   }
 
   const scanRow = scansDb.getLatestScan(category, container);
-  return res.status(200).json(buildDashboardPayload(scanRow));
+  return res.status(200).json(buildDashboardPayload(scanRow, catalog));
 });
 
 module.exports = router;
