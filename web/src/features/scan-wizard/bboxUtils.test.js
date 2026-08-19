@@ -46,25 +46,33 @@ describe('getBoxStyle', () => {
     });
   });
 
-  test('marks is_unknown boxes as the unknown variant regardless of sku_id', () => {
+  test('marks is_unknown boxes as the needs_review variant regardless of sku_id', () => {
     expect(getBoxStyle({ type: 'product', sku_id: null, is_unknown: true }, quantities)).toEqual({
-      variant: 'unknown',
+      variant: 'needs_review',
+      reason: 'unknown',
     });
   });
 
-  test('marks type gap boxes as the gap variant', () => {
-    expect(getBoxStyle({ type: 'gap', sku_id: null, is_unknown: false }, quantities)).toEqual({
+  test('marks type gap boxes without needs_review as the gap variant', () => {
+    expect(getBoxStyle({ type: 'gap', sku_id: null, is_unknown: false, needs_review: false }, quantities)).toEqual({
       variant: 'gap',
     });
   });
 
-  test('marks excluded_from_count + needs_review boxes as the excluded variant even when also is_unknown', () => {
+  test('marks type gap boxes with needs_review as the needs_review variant', () => {
+    expect(getBoxStyle({ type: 'gap', sku_id: null, is_unknown: false, needs_review: true }, quantities)).toEqual({
+      variant: 'needs_review',
+      reason: 'gap_uncertain',
+    });
+  });
+
+  test('marks excluded_from_count + needs_review boxes as the needs_review variant even when also is_unknown', () => {
     expect(
       getBoxStyle(
         { type: 'product', sku_id: 'choco_pie_org', is_unknown: true, excluded_from_count: true, needs_review: true },
         quantities
       )
-    ).toEqual({ variant: 'excluded' });
+    ).toEqual({ variant: 'needs_review', reason: 'duplicate' });
   });
 
   test('marks excluded_from_count boxes without needs_review as the hidden variant', () => {

@@ -107,7 +107,7 @@ export default function EditStep({
 
       {needsReviewCount > 0 && (
         <p className="text-sm font-medium text-status-out">
-          {needsReviewCount} vùng cần kiểm tra kỹ (có thể sai loại sản phẩm) — xem viền tím trên ảnh bên trái.
+          {needsReviewCount} vùng cần kiểm tra kỹ (có thể sai loại sản phẩm) — xem viền vàng nét đứt trên ảnh bên trái.
         </p>
       )}
 
