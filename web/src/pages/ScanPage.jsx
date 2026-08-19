@@ -122,7 +122,9 @@ export default function ScanPage({ prefill }) {
           imageBlob: croppedImageBlob,
           width: analyzeResult.image.width,
           height: analyzeResult.image.height,
-        }).catch(() => {});
+        }).catch((err) => {
+          console.warn('Failed to upload scan image:', err);
+        });
       }
       setConfirmed(true);
     } catch (err) {

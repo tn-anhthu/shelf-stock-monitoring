@@ -319,4 +319,86 @@ describe('POST /confirm/:scanId/image', () => {
     // no file landed under any name derived from this scan_id.
     expect(fs.readdirSync(getUploadsDir())).toEqual(before);
   });
+
+  test('a failed re-upload does not destroy a previously-saved good image', async () => {
+    await request(app).post('/confirm').send({
+      scan_id: 'img-scan-reupload',
+      category: 'mi-goi',
+      container: 'ke-a',
+      quantities: QUANTITIES,
+      total_value: 60000,
+    });
+
+    const goodRes = await request(app)
+      .post('/confirm/img-scan-reupload/image')
+      .field('width', '4032')
+      .field('height', '3024')
+      .attach('image', FAKE_IMAGE, 'shelf.jpg');
+    expect(goodRes.status).toBe(200);
+
+    const filePath = path.join(getUploadsDir(), 'img-scan-reupload.jpg');
+    const originalBytes = fs.readFileSync(filePath);
+    expect(Buffer.compare(originalBytes, FAKE_IMAGE)).toBe(0);
+
+    const BAD_IMAGE = Buffer.from([0xff, 0xd8, 0xff, 0xdb]);
+    const badRes = await request(app)
+      .post('/confirm/img-scan-reupload/image')
+      .field('width', '-5')
+      .field('height', '3024')
+      .attach('image', BAD_IMAGE, 'shelf2.jpg');
+    expect(badRes.status).toBe(400);
+
+    // The original good file must still be present, unchanged, on disk.
+    expect(fs.existsSync(filePath)).toBe(true);
+    expect(Buffer.compare(fs.readFileSync(filePath), originalBytes)).toBe(0);
+
+    // No leftover staging file should remain.
+    const leftovers = fs
+      .readdirSync(getUploadsDir())
+      .filter((name) => name.startsWith('img-scan-reupload.') && name !== 'img-scan-reupload.jpg');
+    expect(leftovers).toEqual([]);
+
+    const saved = scansDb.getScanById('img-scan-reupload');
+    expect(saved.image_path).toBe('img-scan-reupload.jpg');
+  });
+
+  test('returns 400 (not 500) when the file is attached under the wrong field name', async () => {
+    await request(app).post('/confirm').send({
+      scan_id: 'img-scan-wrongfield',
+      category: 'mi-goi',
+      container: 'ke-a',
+      quantities: QUANTITIES,
+      total_value: 60000,
+    });
+
+    const res = await request(app)
+      .post('/confirm/img-scan-wrongfield/image')
+      .field('width', '100')
+      .field('height', '100')
+      .attach('not_image', FAKE_IMAGE, 'shelf.jpg');
+
+    expect(res.status).toBe(400);
+    expect(typeof res.body.error).toBe('string');
+    expect(res.text).not.toContain('at ');
+  });
+
+  test('returns 400 (not 500) for an upload exceeding the 20MB size limit', async () => {
+    await request(app).post('/confirm').send({
+      scan_id: 'img-scan-toobig',
+      category: 'mi-goi',
+      container: 'ke-a',
+      quantities: QUANTITIES,
+      total_value: 60000,
+    });
+
+    const OVERSIZED_IMAGE = Buffer.alloc(21 * 1024 * 1024);
+    const res = await request(app)
+      .post('/confirm/img-scan-toobig/image')
+      .field('width', '100')
+      .field('height', '100')
+      .attach('image', OVERSIZED_IMAGE, 'shelf.jpg');
+
+    expect(res.status).toBe(400);
+    expect(typeof res.body.error).toBe('string');
+  });
 });
