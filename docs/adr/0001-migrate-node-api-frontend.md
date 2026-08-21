@@ -3,13 +3,13 @@
 **Status:** Accepted (2026-07-28)
 **Liên quan:** Spec gốc, Mục 2 (Trong scope), Mục 6 (Frontend Requirements)
 
-## Context (Bối cảnh)
+## Context 
 
 Spec ban đầu (Mục 2) đã chốt: chạy local qua Streamlit/Gradio, không deploy public. Kiến trúc này là 1 process Python duy nhất, Streamlit tự vẽ UI và gọi model trong cùng runtime.
 
 Từ lúc chốt spec, phát sinh 1 mục tiêu bổ sung chưa có trong bản gốc: dùng ShelfSense để học thêm kĩ năng của software engineering (JS, API design, testing) để phục vụ ứng tuyển việc làm. Đây là constraint mới cần đưa vào scope, dẫn tới việc phải xem lại lựa chọn kiến trúc ban đầu.
 
-## Decision (Quyết định)
+## Decision
 
 Tách kiến trúc thành 2 tầng:
 

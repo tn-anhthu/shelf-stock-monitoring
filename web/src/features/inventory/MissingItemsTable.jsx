@@ -7,6 +7,8 @@ import GapImageModal from './GapImageModal.jsx';
 
 const UNRESOLVED_VALUE = '__unresolved__';
 
+const GRID_COLS = 'grid-cols-[56px_1.4fr_1.4fr_260px_120px]';
+
 export default function MissingItemsTable({
   missingItems,
   quantities,
@@ -67,92 +69,119 @@ export default function MissingItemsTable({
   return (
     <div className="mt-6 border-t border-ink pt-4">
       <h2 className="font-heading text-sm font-bold uppercase tracking-wide text-text-secondary">
-        Sản phẩm nghi thiếu (gap chưa xác định SKU)
+        Missing Items
       </h2>
       {confirmedAt && (
         <p className="mt-1 text-xs text-text-secondary">
-          Dựa trên lần quét gần nhất — {new Date(confirmedAt).toLocaleString('vi-VN')}
+          Based on latest scan — {new Date(confirmedAt).toLocaleString('vi-VN')}
         </p>
       )}
-      <table className="mt-3 w-full border-collapse text-sm">
-        <thead>
-          <tr className="border-b border-ink text-left text-xs font-semibold uppercase tracking-wide text-text-secondary">
-            <th className="py-2 pr-2">Xem</th>
-            <th className="py-2 pr-2">Sản phẩm lân cận</th>
-            <th className="pr-2">Gợi ý SKU</th>
-            <th className="pr-2">Chọn xác nhận</th>
-            <th className="pr-2">Trạng thái</th>
-          </tr>
-        </thead>
-        <tbody>
-          {missingItems.map((item) => {
-            const resolved = isGapResolved(item.gap_box_id, quantities);
-            const status = resolved ? 'confirmed' : dismissed.has(item.gap_box_id) ? 'unresolved' : 'needs_review';
-            return (
-              <tr key={item.gap_box_id} className="border-b border-card-border align-top">
-                <td className="py-2.5 pr-2">
-                  {imageUrl ? (
-                    <button
-                      type="button"
-                      onClick={() => setViewingItem(item)}
-                      className="text-xs text-text-secondary underline decoration-1 underline-offset-2 hover:text-ink"
+      <div className="mt-3 border-t border-ink">
+        <div
+          className={`sticky top-0 z-10 grid ${GRID_COLS} gap-4 border-b border-ink bg-page py-2.5 text-[10px] font-bold uppercase tracking-wide text-text-secondary`}
+        >
+          <div>Preview</div>
+          <div>Neighbor Products</div>
+          <div>Suggest</div>
+          <div>Select SKU</div>
+          <div className="text-right">Status</div>
+        </div>
+
+        {missingItems.map((item) => {
+          const resolved = isGapResolved(item.gap_box_id, quantities);
+          const status = resolved ? 'confirmed' : dismissed.has(item.gap_box_id) ? 'unresolved' : 'needs_review';
+          return (
+            <div
+              key={item.gap_box_id}
+              className={`grid ${GRID_COLS} gap-4 items-start border-b border-card-border py-2.5 text-sm`}
+            >
+              <div>
+                {imageUrl ? (
+                  <button
+                    type="button"
+                    onClick={() => setViewingItem(item)}
+                    className="text-xs text-text-secondary underline decoration-1 underline-offset-2 hover:text-ink"
+                  >
+                    Xem
+                  </button>
+                ) : (
+                  <span className="text-text-muted">—</span>
+                )}
+              </div>
+              <div className="text-text-secondary">
+                {item.nearby_skus.length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {item.nearby_skus.map((s) => (
+                      <span
+                        key={s.sku_id}
+                        className="rounded-sm border border-card-border bg-page px-1.5 py-0.5 text-xs leading-relaxed text-text-secondary"
+                      >
+                        {s.sku_name}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  '—'
+                )}
+              </div>
+              <div className="text-text-secondary">
+                {item.candidates.length > 0 ? (
+                  <div className="flex flex-wrap gap-1">
+                    {item.candidates.map((c) => (
+                      <span
+                        key={c.sku_id}
+                        className="rounded-sm border border-card-border bg-page px-1.5 py-0.5 text-xs leading-relaxed text-text-secondary"
+                      >
+                        {c.sku_name}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  'Không xác định được gợi ý — cần kiểm tra thủ công'
+                )}
+              </div>
+              <div>
+                {status === 'needs_review' ? (
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={selections[item.gap_box_id] ?? ''}
+                      onChange={(e) => setSelections((prev) => ({ ...prev, [item.gap_box_id]: e.target.value }))}
+                      className="flex-1 min-w-0 truncate border-0 border-b border-ink bg-transparent px-0 py-1 focus:outline-none"
                     >
-                      Xem
-                    </button>
-                  ) : (
-                    <span className="text-text-muted">—</span>
-                  )}
-                </td>
-                <td className="py-2.5 pr-2 text-text-secondary">
-                  {item.nearby_skus.length > 0 ? item.nearby_skus.map((s) => s.sku_name).join(', ') : '—'}
-                </td>
-                <td className="pr-2 text-text-secondary">
-                  {item.candidates.length > 0
-                    ? item.candidates.map((c) => c.sku_name).join(', ')
-                    : 'Không xác định được gợi ý — cần kiểm tra thủ công'}
-                </td>
-                <td className="pr-2">
-                  {status === 'needs_review' ? (
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={selections[item.gap_box_id] ?? ''}
-                        onChange={(e) => setSelections((prev) => ({ ...prev, [item.gap_box_id]: e.target.value }))}
-                        className="border-0 border-b border-ink bg-transparent px-0 py-1 focus:outline-none"
-                      >
-                        <option value="">— Chọn —</option>
-                        {item.candidates.filter((c) => !isDuplicateSku(quantities, c.sku_id)).map((c) => (
-                          <option key={c.sku_id} value={c.sku_id}>{c.sku_name}</option>
+                      <option value="">— Chọn —</option>
+                      {item.candidates.filter((c) => !isDuplicateSku(quantities, c.sku_id)).map((c) => (
+                        <option key={c.sku_id} value={c.sku_id}>{c.sku_name}</option>
+                      ))}
+                      <optgroup label="Khác (toàn bộ danh mục)">
+                        {catalog.filter((c) => !isDuplicateSku(quantities, c.sku_id)).map((c) => (
+                          <option key={c.sku_id} value={c.sku_id}>{c.name}</option>
                         ))}
-                        <optgroup label="Khác (toàn bộ danh mục)">
-                          {catalog.filter((c) => !isDuplicateSku(quantities, c.sku_id)).map((c) => (
-                            <option key={c.sku_id} value={c.sku_id}>{c.name}</option>
-                          ))}
-                        </optgroup>
-                        <option value={UNRESOLVED_VALUE}>Không xác định</option>
-                      </select>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => handleConfirm(item)}
-                        disabled={!selections[item.gap_box_id] || savingId === item.gap_box_id}
-                      >
-                        {savingId === item.gap_box_id ? 'Đang lưu…' : 'Xác nhận'}
-                      </Button>
-                    </div>
-                  ) : (
-                    <span className="text-text-muted">—</span>
-                  )}
-                </td>
-                <td className="pr-2">
-                  {status === 'confirmed' && <span className="font-bold text-status-ok">Đã xác nhận</span>}
-                  {status === 'unresolved' && <span className="text-text-muted">Không xác định</span>}
-                  {status === 'needs_review' && <span className="font-medium text-status-out">Cần kiểm tra</span>}
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                      </optgroup>
+                      <option value={UNRESOLVED_VALUE}>Không xác định</option>
+                    </select>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="shrink-0"
+                      onClick={() => handleConfirm(item)}
+                      disabled={!selections[item.gap_box_id] || savingId === item.gap_box_id}
+                    >
+                      {savingId === item.gap_box_id ? 'Đang lưu…' : 'Xác nhận'}
+                    </Button>
+                  </div>
+                ) : (
+                  <span className="text-text-muted">—</span>
+                )}
+              </div>
+              <div className="text-right">
+                {status === 'confirmed' && <span className="font-bold text-status-ok">Đã xác nhận</span>}
+                {status === 'unresolved' && <span className="text-text-muted">Không xác định</span>}
+                {status === 'needs_review' && <span className="font-medium text-status-out">Cần kiểm tra</span>}
+              </div>
+            </div>
+          );
+        })}
+      </div>
       {saveError && <p className="mt-2 text-status-out">Lưu thất bại: {saveError}</p>}
       {viewingItem && (
         <GapImageModal

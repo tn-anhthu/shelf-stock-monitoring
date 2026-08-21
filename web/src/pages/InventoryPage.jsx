@@ -60,7 +60,7 @@ export default function InventoryPage({ onScanShelf }) {
   const selectedContainer = selectedCategory?.containers.find((c) => c.id === container);
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="mx-auto max-w-6xl">
       <header className="flex items-baseline justify-between gap-4 border-b border-card-border pb-4">
         <div>
           <h1 className="font-heading text-xl font-bold text-ink">Tình trạng kệ hàng</h1>

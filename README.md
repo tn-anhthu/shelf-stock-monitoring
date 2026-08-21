@@ -55,7 +55,7 @@ Kết quả AI luôn là bản nháp. Hệ thống chỉ ghi vào tồn kho chí
 
 **Classification (SigLIP2 zero-shot + LLM verify, eval set 150 dòng ảnh thật, catalog 144 SKU):**
 
-- SigLIP2 retrieval thuần: recall@1 = 57.1%, recall@5 = 92.9%.
+- SigLIP2 retrieval thuần (n=98 dòng solvable, catalog có đúng SKU cần tìm): recall@1 = 70.4%, recall@5 = 91.8%.
 - Sau khi thêm LLM verify: 85.7% (84/98) khi catalog có đúng SKU cần tìm, 80.7% (121/150) tính cả trường hợp catalog thiếu SKU và cần model biết từ chối trả lời thay vì đoán bừa.
 - Phát hiện đáng chú ý: khi catalog không có SKU đúng, LLM chỉ từ chối đúng cách 75% số lần, 25% còn lại vẫn cố gán 1 SKU sai thay vì báo "không xác định". Đây là hướng cải thiện tiếp theo (tune ngưỡng từ chối của prompt verify).
 
